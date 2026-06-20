@@ -1662,11 +1662,11 @@ const ProfileScreen = ({ onLogout, onNavigate, profile }) => {
         <h3 style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 18, fontWeight: 900 }}>{profile?.full_name || "مستخدم جديد"}</h3>
         <p style={{ margin: "0 0 8px", color: T.textSecondary, fontSize: 13 }}>📱 {profile?.phone || "—"} | 📍 {profile?.city || "غير محدد"}</p>
         <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
-          <Badge color={T.blue}>مشتري</Badge>
-          <Badge color={T.green}>موثق ✓</Badge>
+          <Badge color={T.blue}>{roleLabels[profile?.role] || "مشتري"}</Badge>
+          {profile?.verified ? <Badge color={T.green}>موثق ✓</Badge> : <Badge color={T.textMuted}>غير موثق</Badge>}
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-          {[["١٢", "طلباتي"], ["٣", "مراجعاتي"], ["٤٥", "مفضلاتي"]].map(([v, l]) => (
+          {[["٠", "طلباتي"], ["٠", "مراجعاتي"], ["٠", "مفضلاتي"]].map(([v, l]) => (
             <div key={l} style={{ flex: 1, background: T.navyMid, borderRadius: 10, padding: 10 }}>
               <div style={{ color: T.gold, fontWeight: 900, fontSize: 18 }}>{v}</div>
               <div style={{ color: T.textMuted, fontSize: 10 }}>{l}</div>
