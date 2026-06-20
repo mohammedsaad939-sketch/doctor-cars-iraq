@@ -270,7 +270,7 @@ const translateAuthError = (msg = "") => {
   return map[msg] || msg || "حدث خطأ غير متوقع، حاول مرة أخرى";
 };
 
-const AuthScreen = ({ onLogin, signUp, signIn, authError }) => {
+const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => {
   const [mode, setMode] = useState("login");
   const [userType, setUserType] = useState("buyer");
   const [phone, setPhone] = useState("");
@@ -390,14 +390,15 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError }) => {
           <span style={{ position: "relative", background: T.navyCard, padding: "0 12px", color: T.textMuted, fontSize: 12 }}>أو</span>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <Btn variant="ghost" size="sm" icon="📱">متجر Apple</Btn>
-          <Btn variant="ghost" size="sm" icon="🤖">متجر Google</Btn>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <Btn variant="ghost" size="sm" icon="🔵" fullWidth onClick={() => signInWithOAuth("google")}>الدخول بحساب Google</Btn>
+          <Btn variant="ghost" size="sm" icon="📘" fullWidth onClick={() => signInWithOAuth("facebook")}>الدخول بحساب Facebook</Btn>
+          <Btn variant="ghost" size="sm" icon="🍎" fullWidth disabled>الدخول بحساب Apple (قريباً)</Btn>
         </div>
       </div>
 
       <p style={{ color: T.textMuted, fontSize: 11, marginTop: 24, textAlign: "center", lineHeight: 1.6, maxWidth: 320 }}>
-        🔒 جميع بياناتك محمية بتشفير عسكري المستوى. نحترم خصوصيتك ولا نشارك بياناتك مع أي طرف ثالث.
+        🔒 بياناتك محمية عبر اتصال مشفّر (HTTPS). نحترم خصوصيتك ولا نشارك بياناتك مع أي طرف ثالث.
       </p>
       <p style={{ color: T.textMuted, fontSize: 10, marginTop: 14, textAlign: "center", opacity: 0.7 }}>
         © {OWNER.year} {OWNER.nameAr} ({OWNER.name}) — جميع الحقوق محفوظة | توقيع: {OWNER.signature}
@@ -1757,7 +1758,7 @@ const PartRequestScreen = () => {
 // MAIN APP
 // ══════════════════════════════════════════════════════════════
 export default function DoctorCarsApp() {
-  const { session, profile, loading, authError, signUp, signIn, signOut } = useAuth();
+  const { session, profile, loading, authError, signUp, signIn, signOut, signInWithOAuth } = useAuth();
   const [currentScreen, setCurrentScreen] = useState("home");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [cartItems, setCartItems] = useState([]);
@@ -1805,7 +1806,7 @@ export default function DoctorCarsApp() {
   if (!session) {
     return (
       <div dir="rtl" style={{ fontFamily: "'Cairo', 'Tajawal', 'Segoe UI', sans-serif" }}>
-        <AuthScreen signUp={signUp} signIn={signIn} authError={authError} />
+        <AuthScreen signUp={signUp} signIn={signIn} authError={authError} signInWithOAuth={signInWithOAuth} />
       </div>
     );
   }

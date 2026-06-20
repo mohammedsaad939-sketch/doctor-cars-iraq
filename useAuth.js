@@ -70,5 +70,20 @@ export function useAuth() {
     await supabase.auth.signOut();
   };
 
-  return { session, profile, loading, authError, signUp, signIn, signOut };
+  // تسجيل دخول عبر مزوّد خارجي (Google, Facebook, Apple)
+  // يفتح صفحة المزوّد، وبعد الموافقة يُرجع المستخدم تلقائياً لموقعنا مسجّلاً دخوله
+  const signInWithOAuth = async (provider) => {
+    setAuthError(null);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) {
+      setAuthError(error.message);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  };
+
+  return { session, profile, loading, authError, signUp, signIn, signOut, signInWithOAuth };
 }
