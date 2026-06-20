@@ -1,0 +1,29 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  background: #060E1F;
+  overscroll-behavior-y: none;
+}
+
+body {
+  font-family: 'Cairo', 'Tajawal', 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input, textarea, select {
+  font-family: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
