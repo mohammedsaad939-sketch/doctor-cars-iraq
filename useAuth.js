@@ -38,7 +38,7 @@ export function useAuth() {
       .select("*")
       .eq("id", userId)
       .single();
-    if (!error) setProfile(data);
+    if (!error) { setProfile(data); } else { alert("PROFILE ERROR: " + JSON.stringify(error)); }
     setLoading(false);
   };
 
