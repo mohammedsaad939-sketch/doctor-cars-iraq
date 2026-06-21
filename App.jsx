@@ -641,7 +641,8 @@ const ShopScreen = ({ onProductView, onCartAdd }) => {
   const [showFilters, setShowFilters] = useState(false);
 
   const categories = ["الكل", ...MOCK.categories.slice(0, 6).map(c => c.name)];
-  const filtered = activeCategory === "الكل" ? products : products.filter(p => p.cat...
+    const filtered = activeCategory === "الكل" ? products : products.filter(p => p.category === activeCategory || MOCK.categories.find(c => c.name === activeCategory)?.name === p.category);
+
   return (
     <div style={{ padding: 16 }}>
       <h2 style={{ margin: "0 0 16px", color: T.textPrimary, fontSize: 20, fontWeight: 800 }}>المتجر 🛍️</h2>
