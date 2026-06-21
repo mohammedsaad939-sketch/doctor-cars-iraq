@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "./useAuth";
-
+import { supabase } from "./supabaseClient";
 // ═══════════════════════════════════════════════════════
 // OWNERSHIP — دكتور السيارات (Doctor Cars Iraq)
 // تطبيق iOS / Android / Web
@@ -605,14 +605,43 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount }) => {
 
 // ── SHOP SCREEN ──────────────────────────────────────
 const ShopScreen = ({ onProductView, onCartAdd }) => {
+  const [products, setProducts] = useState(MOCK.products);
+  useEffect(() => {
+    supabase.from("products").select("*, sellers(store_name, verified, rating), categories(name)").then(({ data, error }) => {
+      if (!error && data) {
+        setProducts(data.map(p => ({
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          oldPrice: p.old_price,
+          category: p.categories?.name,
+          seller: p.sellers?.store_name,
+          sellerVerified: p.sellers?.verified,
+          rating: p.sellers?.rating || 0,
+          reviews: 0,
+          city: p.city,
+          image: (p.images && p.images[0]) || "🚗",
+          condition: p.condition,
+          stock: p.stock,
+          partNo: p.part_no,
+          brand: p.brand,
+          model: p.model,
+          year: p.year,
+          mileage: p.mileage,
+          transmission: p.transmission,
+          fuel_type: p.fuel_type
+        })));
+      }
+    });
+  }, []);
+
   const [activeCategory, setActiveCategory] = useState("الكل");
   const [sortBy, setSortBy] = useState("default");
   const [priceRange, setPriceRange] = useState([0, 500000]);
   const [showFilters, setShowFilters] = useState(false);
 
   const categories = ["الكل", ...MOCK.categories.slice(0, 6).map(c => c.name)];
-  const filtered = activeCategory === "الكل" ? MOCK.products : MOCK.products.filter(p => p.category === activeCategory || MOCK.categories.find(c => c.name === activeCategory)?.name === p.category);
-
+  const filtered = activeCategory === "الكل" ? products : products.filter(p => p.cat...
   return (
     <div style={{ padding: 16 }}>
       <h2 style={{ margin: "0 0 16px", color: T.textPrimary, fontSize: 20, fontWeight: 800 }}>المتجر 🛍️</h2>
