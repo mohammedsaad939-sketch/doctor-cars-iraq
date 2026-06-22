@@ -1230,8 +1230,101 @@ const GarageScreen = () => {
 };
 
 // ── SELLER DASHBOARD SCREEN ──────────────────────────────────────
-const SellerDashScreen = () => {
+const SellerDashScreen = ({ session }) => {
   const [activeTab, setActiveTab] = useState("overview");
+  const [sellerId, setSellerId] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [form, setForm] = useState({
+    name: "", price: "", old_price: "", category_id: "",
+    stock: "1", condition: "new", city: "",
+    brand: "", model: "", year: "", mileage: "", transmission: "", fuel_type: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const user = session?.user;
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase.from("sellers").select("id").eq("owner_id", user.id).single();
+      if (data) { setSellerId(data.id); loadProducts(data.id); }
+    })();
+    (async () => {
+      const { data } = await supabase.from("categories").select("id,name").order("sort_order");
+      setCategories(data || []);
+    })();
+  }, [user?.id]);
+
+  const loadProducts = async (sid) => {
+    setProductsLoading(true);
+    const { data } = await supabase.from("products").select("*").eq("seller_id", sid).order("created_at", { ascending: false });
+    setProducts(data || []);
+    setProductsLoading(false);
+  };
+
+  const selectedCat = categories.find(c => String(c.id) === String(form.category_id));
+  const isCarCategory = selectedCat?.name?.includes("سيارات");
+
+  const resetForm = () => setForm({
+    name: "", price: "", old_price: "", category_id: "",
+    stock: "1", condition: "new", city: "",
+    brand: "", model: "", year: "", mileage: "", transmission: "", fuel_type: "",
+  });
+
+  const handleSave = async () => {
+    if (!form.name.trim() || !form.price || !form.category_id) {
+      setSaveError("يرجى ملء الحقول المطلوبة: الاسم والسعر والقسم");
+      return;
+    }
+    setSaveError(null);
+    setSaving(true);
+    const { data: sellerData, error: sellerErr } = await supabase.from("sellers").select("id").eq("owner_id", user.id).single();
+    if (sellerErr || !sellerData) {
+      setSaveError("لا يوجد متجر مرتبط بحسابك");
+      setSaving(false);
+      return;
+    }
+    const payload = {
+      name: form.name.trim(),
+      price: Number(form.price),
+      old_price: form.old_price ? Number(form.old_price) : null,
+      category_id: form.category_id,
+      stock: Number(form.stock) || 1,
+      condition: form.condition,
+      city: form.city.trim() || null,
+      seller_id: sellerData.id,
+      status: "active",
+      images: [],
+    };
+    if (isCarCategory) {
+      payload.brand = form.brand.trim() || null;
+      payload.model = form.model.trim() || null;
+      payload.year = form.year ? Number(form.year) : null;
+      payload.mileage = form.mileage ? Number(form.mileage) : null;
+      payload.transmission = form.transmission || null;
+      payload.fuel_type = form.fuel_type || null;
+    }
+    const { error: insertErr } = await supabase.from("products").insert(payload);
+    setSaving(false);
+    if (insertErr) { setSaveError(insertErr.message); return; }
+    setShowAddModal(false);
+    resetForm();
+    setSaveSuccess(true);
+    loadProducts(sellerData.id);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const selectStyle = {
+    width: "100%", background: T.navyLight, border: `1px solid ${T.navyBorder}`,
+    borderRadius: 10, padding: "11px 14px", color: T.textPrimary,
+    fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box",
+    appearance: "none", cursor: "pointer",
+  };
 
   const stats = [
     { label: "مبيعات اليوم", value: "١٢", icon: "📦", trend: "+15%" },
@@ -1257,6 +1350,12 @@ const SellerDashScreen = () => {
         </div>
         <Badge color={T.green}>✓ موثق</Badge>
       </div>
+
+      {saveSuccess && (
+        <div style={{ background: `${T.green}22`, border: `1px solid ${T.green}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 12, color: T.green, fontSize: 13, fontWeight: 700 }}>
+          ✓ تمت إضافة المنتج بنجاح
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
@@ -1338,23 +1437,34 @@ const SellerDashScreen = () => {
 
       {activeTab === "products" && (
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-            <span style={{ color: T.textSecondary, fontSize: 13 }}>٤٥٠ منتج</span>
-            <Btn size="sm" icon="+" variant="primary">منتج جديد</Btn>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <span style={{ color: T.textSecondary, fontSize: 13 }}>{products.length} منتج</span>
+            <Btn size="sm" icon="+" variant="primary" onClick={() => { setSaveError(null); setSaveSuccess(false); resetForm(); setShowAddModal(true); }}>منتج جديد</Btn>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            {MOCK.products.slice(0, 4).map(p => (
-              <Card key={p.id}>
-                <div style={{ fontSize: 36, textAlign: "center", background: T.navyLight, borderRadius: 10, padding: "10px 0", marginBottom: 8 }}>{p.image}</div>
-                <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{p.name}</p>
-                <p style={{ margin: "0 0 8px", color: T.gold, fontSize: 13, fontWeight: 800 }}>{p.price.toLocaleString("ar-IQ")} د.ع</p>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <Btn size="sm" variant="ghost" fullWidth>تعديل</Btn>
-                  <Btn size="sm" variant="danger">🗑️</Btn>
-                </div>
-              </Card>
-            ))}
-          </div>
+          {productsLoading ? (
+            <div style={{ textAlign: "center", padding: 40, color: T.textSecondary, fontSize: 13 }}>جارٍ التحميل...</div>
+          ) : products.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 40 }}>
+              <div style={{ fontSize: 40, marginBottom: 8 }}>📦</div>
+              <p style={{ color: T.textSecondary, fontSize: 14, margin: 0 }}>لا توجد منتجات بعد. أضف منتجك الأول!</p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {products.map(p => (
+                <Card key={p.id}>
+                  <div style={{ fontSize: 36, textAlign: "center", background: T.navyLight, borderRadius: 10, padding: "10px 0", marginBottom: 8 }}>
+                    {p.images?.[0] ? <img src={p.images[0]} alt={p.name} style={{ width: "100%", height: 60, objectFit: "cover", borderRadius: 8 }} /> : "📦"}
+                  </div>
+                  <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{p.name}</p>
+                  <p style={{ margin: "0 0 8px", color: T.gold, fontSize: 13, fontWeight: 800 }}>{Number(p.price).toLocaleString("ar-IQ")} د.ع</p>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <Btn size="sm" variant="ghost" fullWidth>تعديل</Btn>
+                    <Btn size="sm" variant="danger">🗑️</Btn>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -1369,6 +1479,75 @@ const SellerDashScreen = () => {
           <Btn fullWidth variant="secondary" icon="📊">تصدير التقرير</Btn>
         </div>
       )}
+
+      <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="إضافة منتج جديد">
+        <Input label="اسم المنتج *" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="مثال: فلتر هواء تويوتا كامري" />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Input label="السعر * (د.ع)" type="number" value={form.price} onChange={v => setForm(f => ({ ...f, price: v }))} placeholder="15000" />
+          <Input label="السعر قبل الخصم (د.ع)" type="number" value={form.old_price} onChange={v => setForm(f => ({ ...f, old_price: v }))} placeholder="20000" />
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>القسم *</label>
+          <select value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))} style={selectStyle}>
+            <option value="">-- اختر القسم --</option>
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Input label="الكمية المتوفرة" type="number" value={form.stock} onChange={v => setForm(f => ({ ...f, stock: v }))} placeholder="1" />
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>الحالة</label>
+            <select value={form.condition} onChange={e => setForm(f => ({ ...f, condition: e.target.value }))} style={selectStyle}>
+              <option value="new">جديد</option>
+              <option value="used">مستخدم</option>
+            </select>
+          </div>
+        </div>
+        <Input label="المدينة" value={form.city} onChange={v => setForm(f => ({ ...f, city: v }))} placeholder="بغداد" />
+        {isCarCategory && (
+          <>
+            <div style={{ borderTop: `1px solid ${T.navyBorder}`, margin: "4px 0 14px", paddingTop: 14 }}>
+              <p style={{ margin: "0 0 12px", color: T.gold, fontSize: 13, fontWeight: 700 }}>🚗 تفاصيل السيارة</p>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <Input label="الماركة" value={form.brand} onChange={v => setForm(f => ({ ...f, brand: v }))} placeholder="Toyota" />
+              <Input label="الموديل" value={form.model} onChange={v => setForm(f => ({ ...f, model: v }))} placeholder="Camry" />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <Input label="السنة" type="number" value={form.year} onChange={v => setForm(f => ({ ...f, year: v }))} placeholder="2022" />
+              <Input label="الممشى (كم)" type="number" value={form.mileage} onChange={v => setForm(f => ({ ...f, mileage: v }))} placeholder="50000" />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>نوع القير</label>
+                <select value={form.transmission} onChange={e => setForm(f => ({ ...f, transmission: e.target.value }))} style={selectStyle}>
+                  <option value="">-- اختر --</option>
+                  <option value="automatic">أوتوماتيك</option>
+                  <option value="manual">يدوي</option>
+                </select>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>نوع الوقود</label>
+                <select value={form.fuel_type} onChange={e => setForm(f => ({ ...f, fuel_type: e.target.value }))} style={selectStyle}>
+                  <option value="">-- اختر --</option>
+                  <option value="petrol">بنزين</option>
+                  <option value="diesel">ديزل</option>
+                  <option value="hybrid">هايبرد</option>
+                  <option value="electric">كهربائي</option>
+                </select>
+              </div>
+            </div>
+          </>
+        )}
+        {saveError && (
+          <div style={{ background: `${T.red}22`, border: `1px solid ${T.red}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 12, color: T.red, fontSize: 13 }}>
+            ⚠️ {saveError}
+          </div>
+        )}
+        <Btn fullWidth variant="primary" onClick={handleSave} disabled={saving}>
+          {saving ? "جارٍ الحفظ..." : "💾 حفظ المنتج"}
+        </Btn>
+      </Modal>
     </div>
   );
 };
@@ -1857,7 +2036,7 @@ export default function DoctorCarsApp() {
       case "emergency": return <EmergencyScreen />;
       case "request": return <PartRequestScreen />;
       case "academy": return <AcademyScreen />;
-      case "sellerDash": return <SellerDashScreen />;
+      case "sellerDash": return <SellerDashScreen session={session} />;
       case "admin": return <AdminScreen />;
       default: return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartItems.length} />;
     }
