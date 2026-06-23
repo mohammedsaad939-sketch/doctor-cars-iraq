@@ -864,6 +864,26 @@ const AuctionsScreen = ({ onNavigate, session }) => {
   const [auctions, setAuctions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [bidAmount, setBidAmount] = useState({});
+  const [bidState, setBidState] = useState({}); // { [auctionId]: { loading, success, error } }
+
+  const handleBid = async (auctionId) => {
+    if (!user) {
+      setBidState(p => ({ ...p, [auctionId]: { error: "يجب تسجيل الدخول أولاً للمزايدة" } }));
+      return;
+    }
+    const amount = Number(bidAmount[auctionId]);
+    if (!amount) return;
+    setBidState(p => ({ ...p, [auctionId]: { loading: true, error: null, success: false } }));
+    const { error } = await supabase.from("bids").insert({ auction_id: auctionId, bidder_id: user.id, amount });
+    if (error) {
+      setBidState(p => ({ ...p, [auctionId]: { error: error.message } }));
+    } else {
+      setBidState(p => ({ ...p, [auctionId]: { success: true } }));
+      setBidAmount(p => ({ ...p, [auctionId]: "" }));
+      setTimeout(() => setBidState(p => ({ ...p, [auctionId]: {} })), 3000);
+    }
+  };
 
   // Countdown ticker — runs only on "live" tab
   useEffect(() => {
@@ -978,13 +998,32 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                   <p style={{ margin: "0 0 2px", color: T.textMuted, fontSize: 12 }}>السعر الحالي</p>
                   <p style={{ margin: 0, color: T.gold, fontWeight: 900, fontSize: 18 }}>{(auction.current_price || auction.starting_price || 0).toLocaleString("ar-IQ")} د.ع</p>
                 </div>
-                {auction.status === "live" && (
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input type="number" placeholder={`أدنى: ${minRequired.toLocaleString("ar-IQ")}`}
-                      style={{ flex: 1, background: T.navyLight, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 14px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, outline: "none" }} />
-                    <Btn icon="🏷️">زايد الآن</Btn>
-                  </div>
-                )}
+                {auction.status === "live" && (() => {
+                  const bid = bidState[auction.id] || {};
+                  return (
+                    <div>
+                      <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                        <input
+                          type="number"
+                          placeholder={`أدنى: ${minRequired.toLocaleString("ar-IQ")}`}
+                          value={bidAmount[auction.id] || ""}
+                          onChange={e => setBidAmount(p => ({ ...p, [auction.id]: e.target.value }))}
+                          style={{ flex: 1, background: T.navyLight, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 14px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, outline: "none" }}
+                        />
+                        <Btn
+                          onClick={() => handleBid(auction.id)}
+                          variant={bid.success ? "green" : "primary"}
+                          disabled={bid.loading}
+                          icon={bid.loading ? "⏳" : bid.success ? "✓" : "🏷️"}
+                        >
+                          {bid.loading ? "..." : bid.success ? "تم!" : "زايد الآن"}
+                        </Btn>
+                      </div>
+                      {bid.error && <p style={{ margin: "4px 0 0", color: T.red, fontSize: 12, fontWeight: 600 }}>{bid.error}</p>}
+                      {bid.success && <p style={{ margin: "4px 0 0", color: T.green, fontSize: 12, fontWeight: 700 }}>✓ تمت المزايدة بنجاح!</p>}
+                    </div>
+                  );
+                })()}
                 {auction.sellers?.store_name && (
                   <p style={{ margin: "8px 0 0", color: T.textMuted, fontSize: 11, textAlign: "center" }}>
                     {auction.min_increment ? `أدنى زيادة: ${auction.min_increment.toLocaleString("ar-IQ")} د.ع | ` : ""}البائع: {auction.sellers.store_name}
