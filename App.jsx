@@ -858,17 +858,37 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd }) => {
 };
 
 // ── AUCTIONS SCREEN ──────────────────────────────────────
-const AuctionsScreen = ({ onNavigate }) => {
+const AuctionsScreen = ({ onNavigate, session }) => {
+  const user = session?.user ?? null;
   const [activeTab, setActiveTab] = useState("live");
-  const [bidAmount, setBidAmount] = useState({});
-  const [bidSuccess, setBidSuccess] = useState(null);
+  const [auctions, setAuctions] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const handleBid = (auction) => {
-    const amount = bidAmount[auction.id];
-    if (!amount || amount <= auction.currentBid) return;
-    setBidSuccess(auction.id);
-    setTimeout(() => setBidSuccess(null), 2000);
+  const loadAuctions = async (tab) => {
+    setLoading(true);
+    setAuctions([]);
+
+    if (tab === "mine") {
+      if (!user) { setLoading(false); return; }
+      const { data: myBids } = await supabase.from("bids").select("auction_id").eq("bidder_id", user.id);
+      const ids = [...new Set((myBids || []).map(b => b.auction_id))];
+      if (!ids.length) { setLoading(false); return; }
+      const { data } = await supabase.from("auctions").select("*, sellers(store_name)").in("id", ids);
+      setAuctions(data || []);
+      setLoading(false);
+      return;
+    }
+
+    let q = supabase.from("auctions").select("*, sellers(store_name)");
+    if (tab === "live")       q = q.eq("status", "live").order("ends_at");
+    else if (tab === "upcoming") q = q.eq("status", "upcoming").order("starts_at");
+    else if (tab === "ended")    q = q.eq("status", "ended").order("ends_at", { ascending: false });
+    const { data } = await q;
+    setAuctions(data || []);
+    setLoading(false);
   };
+
+  useEffect(() => { loadAuctions(activeTab); }, [activeTab]);
 
   return (
     <div style={{ padding: 16 }}>
@@ -878,59 +898,76 @@ const AuctionsScreen = ({ onNavigate }) => {
         active={activeTab} onChange={setActiveTab}
       />
 
-      {activeTab === "live" && (
+      {loading && <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>⏳ جاري التحميل...</div>}
+
+      {!loading && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {MOCK.auctions.map(auction => (
-            <Card key={auction.id}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <Badge color={T.red}>🔴 مباشر</Badge>
-                <span style={{ color: T.red, fontWeight: 800, fontFamily: "monospace", fontSize: 18 }}>{auction.timeLeft}</span>
-              </div>
-              <div style={{ fontSize: 48, textAlign: "center", background: T.navyLight, borderRadius: 12, padding: "16px 0", marginBottom: 12 }}>{auction.image}</div>
-              <h3 style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 15, fontWeight: 800 }}>{auction.title}</h3>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <div>
-                  <p style={{ margin: "0 0 2px", color: T.textMuted, fontSize: 12 }}>السعر الحالي</p>
-                  <p style={{ margin: 0, color: T.gold, fontWeight: 900, fontSize: 18 }}>{auction.currentBid.toLocaleString("ar-IQ")} د.ع</p>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <p style={{ margin: "0 0 2px", color: T.textMuted, fontSize: 12 }}>عدد المزايدين</p>
-                  <p style={{ margin: 0, color: T.textPrimary, fontWeight: 700, fontSize: 16 }}>{auction.bids}</p>
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  type="number"
-                  placeholder={`أدنى: ${(auction.currentBid + auction.minBid).toLocaleString()}`}
-                  value={bidAmount[auction.id] || ""}
-                  onChange={e => setBidAmount(prev => ({ ...prev, [auction.id]: parseInt(e.target.value) }))}
-                  style={{ flex: 1, background: T.navyLight, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 14px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, outline: "none" }}
-                />
-                <Btn onClick={() => handleBid(auction)} variant={bidSuccess === auction.id ? "green" : "primary"} icon={bidSuccess === auction.id ? "✓" : "🏷️"}>
-                  {bidSuccess === auction.id ? "تم!" : "زايد"}
-                </Btn>
-              </div>
-              <p style={{ margin: "8px 0 0", color: T.textMuted, fontSize: 11, textAlign: "center" }}>
-                أدنى زيادة: {auction.minBid.toLocaleString("ar-IQ")} د.ع | البائع: {auction.seller}
-              </p>
+          {auctions.length === 0 && activeTab !== "mine" && (
+            <Card style={{ textAlign: "center", padding: 40 }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>{activeTab === "live" ? "🏆" : activeTab === "upcoming" ? "⏳" : "✅"}</div>
+              <p style={{ color: T.textSecondary, margin: 0 }}>لا توجد مزادات في هذا القسم حالياً</p>
             </Card>
-          ))}
+          )}
+          {auctions.length === 0 && activeTab === "mine" && !user && (
+            <Card style={{ textAlign: "center", padding: 40 }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
+              <p style={{ color: T.textSecondary, margin: 0 }}>يجب تسجيل الدخول لعرض مزاداتك</p>
+            </Card>
+          )}
+          {auctions.length === 0 && activeTab === "mine" && user && (
+            <Card style={{ textAlign: "center", padding: 40 }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🎯</div>
+              <p style={{ color: T.textSecondary, margin: 0 }}>لم تشارك في أي مزاد بعد</p>
+            </Card>
+          )}
 
-          {/* Create Auction CTA */}
-          <Card style={{ textAlign: "center", padding: 28, border: `2px dashed ${T.navyBorder}`, background: "transparent" }}>
-            <div style={{ fontSize: 36, marginBottom: 10 }}>🏷️</div>
-            <h4 style={{ margin: "0 0 8px", color: T.textPrimary }}>أنشئ مزادك الخاص</h4>
-            <p style={{ margin: "0 0 16px", color: T.textMuted, fontSize: 13 }}>بع سيارتك أو قطعتك عبر المزاد</p>
-            <Btn>إنشاء مزاد جديد</Btn>
-          </Card>
+          {auctions.map(auction => {
+            const imgIsUrl = isImageUrl(auction.image);
+            const minRequired = (auction.current_price || auction.starting_price || 0) + (auction.min_increment || 0);
+            return (
+              <Card key={auction.id}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  {auction.status === "live" ? <Badge color={T.red}>🔴 مباشر</Badge>
+                    : auction.status === "upcoming" ? <Badge color={T.gold}>⏳ قادم</Badge>
+                    : <Badge color={T.textMuted}>✅ منتهي</Badge>}
+                  {auction.status === "upcoming" && auction.starts_at && (
+                    <span style={{ color: T.gold, fontWeight: 700, fontSize: 12 }}>يبدأ: {new Date(auction.starts_at).toLocaleDateString("ar-IQ")}</span>
+                  )}
+                </div>
+                <div style={{ fontSize: imgIsUrl ? undefined : 48, textAlign: "center", background: T.navyLight, borderRadius: 12, padding: imgIsUrl ? 0 : "16px 0", marginBottom: 12, overflow: "hidden" }}>
+                  {imgIsUrl ? <img src={auction.image} alt={auction.title} style={{ width: "100%", height: 160, objectFit: "cover", borderRadius: 12 }} /> : (auction.image || "🏆")}
+                </div>
+                <h3 style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 15, fontWeight: 800 }}>{auction.title}</h3>
+                {auction.description && <p style={{ margin: "0 0 8px", color: T.textMuted, fontSize: 12 }}>{auction.description}</p>}
+                <div style={{ marginBottom: 12 }}>
+                  <p style={{ margin: "0 0 2px", color: T.textMuted, fontSize: 12 }}>السعر الحالي</p>
+                  <p style={{ margin: 0, color: T.gold, fontWeight: 900, fontSize: 18 }}>{(auction.current_price || auction.starting_price || 0).toLocaleString("ar-IQ")} د.ع</p>
+                </div>
+                {auction.status === "live" && (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input type="number" placeholder={`أدنى: ${minRequired.toLocaleString("ar-IQ")}`}
+                      style={{ flex: 1, background: T.navyLight, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 14px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, outline: "none" }} />
+                    <Btn icon="🏷️">زايد الآن</Btn>
+                  </div>
+                )}
+                {auction.sellers?.store_name && (
+                  <p style={{ margin: "8px 0 0", color: T.textMuted, fontSize: 11, textAlign: "center" }}>
+                    {auction.min_increment ? `أدنى زيادة: ${auction.min_increment.toLocaleString("ar-IQ")} د.ع | ` : ""}البائع: {auction.sellers.store_name}
+                  </p>
+                )}
+              </Card>
+            );
+          })}
+
+          {activeTab === "live" && (
+            <Card style={{ textAlign: "center", padding: 28, border: `2px dashed ${T.navyBorder}`, background: "transparent" }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>🏷️</div>
+              <h4 style={{ margin: "0 0 8px", color: T.textPrimary }}>أنشئ مزادك الخاص</h4>
+              <p style={{ margin: "0 0 16px", color: T.textMuted, fontSize: 13 }}>بع سيارتك أو قطعتك عبر المزاد</p>
+              <Btn>إنشاء مزاد جديد</Btn>
+            </Card>
+          )}
         </div>
-      )}
-
-      {activeTab !== "live" && (
-        <Card style={{ textAlign: "center", padding: 40 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>⏳</div>
-          <p style={{ color: T.textSecondary, margin: 0 }}>لا توجد مزادات في هذا القسم حالياً</p>
-        </Card>
       )}
     </div>
   );
@@ -2158,7 +2195,7 @@ export default function DoctorCarsApp() {
     switch (currentScreen) {
       case "home": return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartItems.length} />;
       case "shop": return <ShopScreen onProductView={handleProductView} onCartAdd={handleCartAdd} />;
-      case "auctions": return <AuctionsScreen onNavigate={navigate} />;
+      case "auctions": return <AuctionsScreen onNavigate={navigate} session={session} />;
       case "garage": return <GarageScreen />;
       case "profile": return <ProfileScreen onLogout={signOut} onNavigate={navigate} profile={profile} />;
       case "productDetail": return <ProductDetailScreen product={selectedProduct} onBack={() => navigate(prevScreen)} onCartAdd={handleCartAdd} />;
