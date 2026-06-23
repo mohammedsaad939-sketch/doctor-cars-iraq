@@ -129,6 +129,8 @@ const Stars = ({ rating, size = 12 }) => {
   );
 };
 
+const isImageUrl = (v) => typeof v === "string" && v.startsWith("http");
+
 const Btn = ({ children, onClick, variant = "primary", size = "md", disabled = false, fullWidth = false, icon = null }) => {
   const styles = {
     primary: { background: `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`, color: T.navy, border: "none" },
@@ -231,7 +233,9 @@ const ProductCard = ({ product, onView, onCart }) => (
         -{Math.round((1 - product.price / product.oldPrice) * 100)}%
       </div>
     )}
-    <div style={{ fontSize: 48, textAlign: "center", marginBottom: 10, background: `${T.navyLight}`, borderRadius: 12, padding: "12px 0" }}>{product.image}</div>
+    <div style={{ fontSize: 48, textAlign: "center", marginBottom: 10, background: `${T.navyLight}`, borderRadius: 12, overflow: "hidden", height: 90, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {isImageUrl(product.image) ? <img src={product.image} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : product.image}
+    </div>
     <div style={{ marginBottom: 6 }}>
       <Badge small>{product.category}</Badge>
     </div>
@@ -730,7 +734,9 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd }) => {
       </div>
 
       {/* Product Image */}
-      <div style={{ background: T.navyCard, padding: 40, textAlign: "center", fontSize: 80, marginBottom: 0 }}>{product.image}</div>
+      <div style={{ background: T.navyCard, textAlign: "center", fontSize: 80, marginBottom: 0, overflow: "hidden", height: isImageUrl(product.image) ? 260 : "auto", padding: isImageUrl(product.image) ? 0 : 40, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {isImageUrl(product.image) ? <img src={product.image} alt={product.name} style={{ width: "100%", height: 260, objectFit: "cover" }} /> : product.image}
+      </div>
 
       <div style={{ padding: "16px 16px" }}>
         {/* Title & Price */}
@@ -1250,8 +1256,11 @@ const SellerDashScreen = ({ session }) => {
     brand: "", model: "", year: "", mileage: "", transmission: "", fuel_type: "",
   });
   const [saving, setSaving] = useState(false);
+  const [savingStage, setSavingStage] = useState("");
   const [saveError, setSaveError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
 
   const user = session?.user;
 
@@ -1277,11 +1286,15 @@ const SellerDashScreen = ({ session }) => {
   const selectedCat = categories.find(c => String(c.id) === String(form.category_id));
   const isCarCategory = selectedCat?.name?.includes("سيارات");
 
-  const resetForm = () => setForm({
-    name: "", price: "", old_price: "", category_id: "",
-    stock: "1", condition: "new", city: "",
-    brand: "", model: "", year: "", mileage: "", transmission: "", fuel_type: "",
-  });
+  const resetForm = () => {
+    setForm({
+      name: "", price: "", old_price: "", category_id: "",
+      stock: "1", condition: "new", city: "",
+      brand: "", model: "", year: "", mileage: "", transmission: "", fuel_type: "",
+    });
+    setImageFile(null);
+    setImagePreview(null);
+  };
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.price || !form.category_id) {
@@ -1290,12 +1303,30 @@ const SellerDashScreen = ({ session }) => {
     }
     setSaveError(null);
     setSaving(true);
+
     const { data: sellerData, error: sellerErr } = await supabase.from("sellers").select("id").eq("owner_id", user.id).single();
     if (sellerErr || !sellerData) {
       setSaveError("لا يوجد متجر مرتبط بحسابك");
       setSaving(false);
       return;
     }
+
+    let images = [];
+    if (imageFile) {
+      setSavingStage("uploading");
+      const path = `${sellerData.id}/${Date.now()}_${imageFile.name}`;
+      const { error: uploadErr } = await supabase.storage.from("product-images").upload(path, imageFile);
+      if (uploadErr) {
+        setSaveError(`فشل رفع الصورة: ${uploadErr.message}`);
+        setSaving(false);
+        setSavingStage("");
+        return;
+      }
+      const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(path);
+      images = [urlData.publicUrl];
+    }
+
+    setSavingStage("saving");
     const payload = {
       name: form.name.trim(),
       price: Number(form.price),
@@ -1306,7 +1337,7 @@ const SellerDashScreen = ({ session }) => {
       city: form.city.trim() || null,
       seller_id: sellerData.id,
       status: "active",
-      images: [],
+      images,
     };
     if (isCarCategory) {
       payload.brand = form.brand.trim() || null;
@@ -1318,6 +1349,7 @@ const SellerDashScreen = ({ session }) => {
     }
     const { error: insertErr } = await supabase.from("products").insert(payload);
     setSaving(false);
+    setSavingStage("");
     if (insertErr) { setSaveError(insertErr.message); return; }
     setShowAddModal(false);
     resetForm();
@@ -1546,13 +1578,32 @@ const SellerDashScreen = ({ session }) => {
             </div>
           </>
         )}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>صورة المنتج (اختياري)</label>
+          {imagePreview && (
+            <div style={{ marginBottom: 8, borderRadius: 10, overflow: "hidden" }}>
+              <img src={imagePreview} alt="معاينة" style={{ width: "100%", height: 140, objectFit: "cover" }} />
+            </div>
+          )}
+          <label style={{ display: "flex", alignItems: "center", gap: 8, background: T.navyLight, border: `1px dashed ${T.navyBorder}`, borderRadius: 10, padding: "10px 14px", cursor: "pointer" }}>
+            <span style={{ fontSize: 18 }}>📷</span>
+            <span style={{ color: T.textSecondary, fontSize: 13 }}>{imageFile ? imageFile.name : "اختر صورة من جهازك..."}</span>
+            <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setImageFile(file);
+              setImagePreview(URL.createObjectURL(file));
+            }} />
+          </label>
+        </div>
+
         {saveError && (
           <div style={{ background: `${T.red}22`, border: `1px solid ${T.red}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 12, color: T.red, fontSize: 13 }}>
             ⚠️ {saveError}
           </div>
         )}
         <Btn fullWidth variant="primary" onClick={handleSave} disabled={saving}>
-          {saving ? "جارٍ الحفظ..." : "💾 حفظ المنتج"}
+          {savingStage === "uploading" ? "⏳ جارٍ رفع الصورة..." : savingStage === "saving" ? "💾 جارٍ حفظ المنتج..." : "💾 حفظ المنتج"}
         </Btn>
       </Modal>
     </div>
