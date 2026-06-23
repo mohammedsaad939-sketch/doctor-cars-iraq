@@ -1491,8 +1491,10 @@ const SellerDashScreen = ({ session }) => {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {products.map(p => (
                 <Card key={p.id}>
-                  <div style={{ fontSize: 36, textAlign: "center", background: T.navyLight, borderRadius: 10, padding: "10px 0", marginBottom: 8 }}>
-                    {p.images?.[0] ? <img src={p.images[0]} alt={p.name} style={{ width: "100%", height: 60, objectFit: "cover", borderRadius: 8 }} /> : "📦"}
+                  <div style={{ fontSize: 36, textAlign: "center", background: T.navyLight, borderRadius: 10, padding: "10px 0", marginBottom: 8, overflow: "hidden" }}>
+                    {isImageUrl(p.images?.[0]) ? (
+                      <img src={p.images[0]} alt={p.name} style={{ width: "100%", height: 60, objectFit: "cover", borderRadius: 8 }} />
+                    ) : (p.images?.[0] || "📦")}
                   </div>
                   <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{p.name}</p>
                   <p style={{ margin: "0 0 8px", color: T.gold, fontSize: 13, fontWeight: 800 }}>{Number(p.price).toLocaleString("ar-IQ")} د.ع</p>
