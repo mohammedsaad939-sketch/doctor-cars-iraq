@@ -1322,6 +1322,26 @@ const SellerDashScreen = ({ session }) => {
     setShowAddModal(true);
   };
 
+  const compressImage = (file) => new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1000;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+        else { width = Math.round(width * MAX / height); height = MAX; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.78);
+    };
+    img.src = url;
+  });
+
   const handleDelete = async (productId) => {
     if (!window.confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
     const { error } = await supabase.from("products").delete().eq("id", productId);
@@ -1349,8 +1369,11 @@ const SellerDashScreen = ({ session }) => {
     let images = editProduct ? (editProduct.images || []) : [];
     if (imageFile) {
       setSavingStage("uploading");
-      const path = `${sellerData.id}/${Date.now()}_${imageFile.name}`;
-      const { error: uploadErr } = await supabase.storage.from("product-images").upload(path, imageFile);
+      const compressed = await compressImage(imageFile);
+      const path = `${sellerData.id}/${Date.now()}.jpg`;
+      const { error: uploadErr } = await supabase.storage
+        .from("product-images")
+        .upload(path, compressed, { contentType: "image/jpeg" });
       if (uploadErr) {
         setSaveError(`فشل رفع الصورة: ${uploadErr.message}`);
         setSaving(false);
