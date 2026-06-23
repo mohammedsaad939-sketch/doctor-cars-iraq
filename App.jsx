@@ -639,9 +639,16 @@ const ShopScreen = ({ onProductView, onCartAdd }) => {
   const [sortBy, setSortBy] = useState("default");
   const [priceRange, setPriceRange] = useState([0, 500000]);
   const [showFilters, setShowFilters] = useState(false);
+  const [shopCategories, setShopCategories] = useState([]);
 
-  const categories = ["الكل", ...MOCK.categories.slice(0, 6).map(c => c.name)];
-    const filtered = activeCategory === "الكل" ? products : products.filter(p => p.category === activeCategory || MOCK.categories.find(c => c.name === activeCategory)?.name === p.category);
+  useEffect(() => {
+    supabase.from("categories").select("id,name").order("sort_order").then(({ data }) => {
+      if (data) setShopCategories(data);
+    });
+  }, []);
+
+  const categoryTabs = ["الكل", ...shopCategories.map(c => c.name)];
+  const filtered = activeCategory === "الكل" ? products : products.filter(p => p.category === activeCategory);
 
   return (
     <div style={{ padding: 16 }}>
@@ -649,7 +656,7 @@ const ShopScreen = ({ onProductView, onCartAdd }) => {
 
       {/* Category Tabs */}
       <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 12, marginBottom: 16 }}>
-        {categories.map(cat => (
+        {categoryTabs.map(cat => (
           <button key={cat} onClick={() => setActiveCategory(cat)} style={{
             background: activeCategory === cat ? `linear-gradient(135deg, ${T.gold}, ${T.goldDark})` : T.navyCard,
             border: `1px solid ${activeCategory === cat ? "transparent" : T.navyBorder}`,
