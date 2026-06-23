@@ -866,6 +866,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
   const [now, setNow] = useState(Date.now());
   const [bidAmount, setBidAmount] = useState({});
   const [bidState, setBidState] = useState({}); // { [auctionId]: { loading, success, error } }
+  const [lastBidsMap, setLastBidsMap] = useState({}); // { [auctionId]: { bidder_id } }
 
   const handleBid = async (auctionId) => {
     if (!user) {
@@ -927,6 +928,13 @@ const AuctionsScreen = ({ onNavigate, session }) => {
       if (!ids.length) { setLoading(false); return; }
       const { data } = await supabase.from("auctions").select("*, sellers(store_name)").in("id", ids);
       setAuctions(data || []);
+      // جلب آخر مزايدة لكل مزاد لمعرفة من هو الأعلى حالياً
+      const { data: latestBids } = await supabase
+        .from("bids").select("auction_id, bidder_id, amount")
+        .in("auction_id", ids).order("created_at", { ascending: false });
+      const map = {};
+      (latestBids || []).forEach(b => { if (!map[b.auction_id]) map[b.auction_id] = b; });
+      setLastBidsMap(map);
       setLoading(false);
       return;
     }
@@ -976,6 +984,8 @@ const AuctionsScreen = ({ onNavigate, session }) => {
           {auctions.map(auction => {
             const imgIsUrl = isImageUrl(auction.image);
             const minRequired = (auction.current_price || auction.starting_price || 0) + (auction.min_increment || 0);
+            const lastBid = lastBidsMap[auction.id];
+            const isTopBidder = activeTab === "mine" && user && lastBid?.bidder_id === user.id;
             return (
               <Card key={auction.id}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -994,9 +1004,16 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                 </div>
                 <h3 style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 15, fontWeight: 800 }}>{auction.title}</h3>
                 {auction.description && <p style={{ margin: "0 0 8px", color: T.textMuted, fontSize: 12 }}>{auction.description}</p>}
-                <div style={{ marginBottom: 12 }}>
-                  <p style={{ margin: "0 0 2px", color: T.textMuted, fontSize: 12 }}>السعر الحالي</p>
-                  <p style={{ margin: 0, color: T.gold, fontWeight: 900, fontSize: 18 }}>{(auction.current_price || auction.starting_price || 0).toLocaleString("ar-IQ")} د.ع</p>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <div>
+                    <p style={{ margin: "0 0 2px", color: T.textMuted, fontSize: 12 }}>السعر الحالي</p>
+                    <p style={{ margin: 0, color: T.gold, fontWeight: 900, fontSize: 18 }}>{(auction.current_price || auction.starting_price || 0).toLocaleString("ar-IQ")} د.ع</p>
+                  </div>
+                  {activeTab === "mine" && (
+                    isTopBidder
+                      ? <span style={{ background: `${T.green}22`, color: T.green, padding: "4px 10px", borderRadius: 8, fontSize: 12, fontWeight: 700 }}>✅ أنت الأعلى</span>
+                      : <span style={{ background: `${T.red}22`, color: T.red, padding: "4px 10px", borderRadius: 8, fontSize: 12, fontWeight: 700 }}>تمت مزايدة أعلى منك</span>
+                  )}
                 </div>
                 {auction.status === "live" && (() => {
                   const bid = bidState[auction.id] || {};
