@@ -1258,9 +1258,10 @@ const SellerDashScreen = ({ session }) => {
   const [saving, setSaving] = useState(false);
   const [savingStage, setSavingStage] = useState("");
   const [saveError, setSaveError] = useState(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [editProduct, setEditProduct] = useState(null);
 
   const user = session?.user;
 
@@ -1296,6 +1297,30 @@ const SellerDashScreen = ({ session }) => {
     setImagePreview(null);
   };
 
+  const handleEdit = (p) => {
+    setEditProduct(p);
+    setForm({
+      name: p.name || "",
+      price: p.price ? String(p.price) : "",
+      old_price: p.old_price ? String(p.old_price) : "",
+      category_id: p.category_id ? String(p.category_id) : "",
+      stock: p.stock ? String(p.stock) : "1",
+      condition: p.condition || "new",
+      city: p.city || "",
+      brand: p.brand || "",
+      model: p.model || "",
+      year: p.year ? String(p.year) : "",
+      mileage: p.mileage ? String(p.mileage) : "",
+      transmission: p.transmission || "",
+      fuel_type: p.fuel_type || "",
+    });
+    setImageFile(null);
+    setImagePreview(isImageUrl(p.images?.[0]) ? p.images[0] : null);
+    setSaveError(null);
+    setSaveSuccessMsg("");
+    setShowAddModal(true);
+  };
+
   const handleSave = async () => {
     if (!form.name.trim() || !form.price || !form.category_id) {
       setSaveError("يرجى ملء الحقول المطلوبة: الاسم والسعر والقسم");
@@ -1311,7 +1336,7 @@ const SellerDashScreen = ({ session }) => {
       return;
     }
 
-    let images = [];
+    let images = editProduct ? (editProduct.images || []) : [];
     if (imageFile) {
       setSavingStage("uploading");
       const path = `${sellerData.id}/${Date.now()}_${imageFile.name}`;
@@ -1335,8 +1360,6 @@ const SellerDashScreen = ({ session }) => {
       stock: Number(form.stock) || 1,
       condition: form.condition,
       city: form.city.trim() || null,
-      seller_id: sellerData.id,
-      status: "active",
       images,
     };
     if (isCarCategory) {
@@ -1347,15 +1370,25 @@ const SellerDashScreen = ({ session }) => {
       payload.transmission = form.transmission || null;
       payload.fuel_type = form.fuel_type || null;
     }
-    const { error: insertErr } = await supabase.from("products").insert(payload);
+
+    let opError;
+    if (editProduct) {
+      const { error } = await supabase.from("products").update(payload).eq("id", editProduct.id);
+      opError = error;
+    } else {
+      const { error } = await supabase.from("products").insert({ ...payload, seller_id: sellerData.id, status: "active" });
+      opError = error;
+    }
     setSaving(false);
     setSavingStage("");
-    if (insertErr) { setSaveError(insertErr.message); return; }
+    if (opError) { setSaveError(opError.message); return; }
+    const msg = editProduct ? "تم تحديث المنتج بنجاح" : "تمت إضافة المنتج بنجاح";
     setShowAddModal(false);
+    setEditProduct(null);
     resetForm();
-    setSaveSuccess(true);
+    setSaveSuccessMsg(msg);
     loadProducts(sellerData.id);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    setTimeout(() => setSaveSuccessMsg(""), 3000);
   };
 
   const selectStyle = {
@@ -1390,9 +1423,9 @@ const SellerDashScreen = ({ session }) => {
         <Badge color={T.green}>✓ موثق</Badge>
       </div>
 
-      {saveSuccess && (
+      {saveSuccessMsg && (
         <div style={{ background: `${T.green}22`, border: `1px solid ${T.green}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 12, color: T.green, fontSize: 13, fontWeight: 700 }}>
-          ✓ تمت إضافة المنتج بنجاح
+          ✓ {saveSuccessMsg}
         </div>
       )}
 
@@ -1499,7 +1532,7 @@ const SellerDashScreen = ({ session }) => {
                   <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{p.name}</p>
                   <p style={{ margin: "0 0 8px", color: T.gold, fontSize: 13, fontWeight: 800 }}>{Number(p.price).toLocaleString("ar-IQ")} د.ع</p>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <Btn size="sm" variant="ghost" fullWidth>تعديل</Btn>
+                    <Btn size="sm" variant="ghost" fullWidth onClick={() => handleEdit(p)}>تعديل</Btn>
                     <Btn size="sm" variant="danger">🗑️</Btn>
                   </div>
                 </Card>
@@ -1521,7 +1554,7 @@ const SellerDashScreen = ({ session }) => {
         </div>
       )}
 
-      <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="إضافة منتج جديد">
+      <Modal isOpen={showAddModal} onClose={() => { setShowAddModal(false); setEditProduct(null); resetForm(); }} title={editProduct ? "تعديل المنتج" : "إضافة منتج جديد"}>
         <Input label="اسم المنتج *" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="مثال: فلتر هواء تويوتا كامري" />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <Input label="السعر * (د.ع)" type="number" value={form.price} onChange={v => setForm(f => ({ ...f, price: v }))} placeholder="15000" />
