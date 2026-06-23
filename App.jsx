@@ -863,6 +863,38 @@ const AuctionsScreen = ({ onNavigate, session }) => {
   const [activeTab, setActiveTab] = useState("live");
   const [auctions, setAuctions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [now, setNow] = useState(Date.now());
+
+  // Countdown ticker — runs only on "live" tab
+  useEffect(() => {
+    if (activeTab !== "live") return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [activeTab]);
+
+  const formatCountdown = (endsAt) => {
+    if (!endsAt) return "—";
+    const diff = new Date(endsAt) - now;
+    if (diff <= 0) return "انتهى";
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
+
+  // Realtime subscription — أشترك عند فتح "مباشر"، وألغِ الاشتراك عند المغادرة
+  useEffect(() => {
+    if (activeTab !== "live") return;
+    const channel = supabase
+      .channel("auctions-realtime")
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "auctions" }, (payload) => {
+        setAuctions(prev => prev.map(a =>
+          a.id === payload.new.id ? { ...a, current_price: payload.new.current_price } : a
+        ));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [activeTab]);
 
   const loadAuctions = async (tab) => {
     setLoading(true);
@@ -930,6 +962,9 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                   {auction.status === "live" ? <Badge color={T.red}>🔴 مباشر</Badge>
                     : auction.status === "upcoming" ? <Badge color={T.gold}>⏳ قادم</Badge>
                     : <Badge color={T.textMuted}>✅ منتهي</Badge>}
+                  {auction.status === "live" && (
+                    <span style={{ color: T.red, fontWeight: 800, fontFamily: "monospace", fontSize: 18 }}>{formatCountdown(auction.ends_at)}</span>
+                  )}
                   {auction.status === "upcoming" && auction.starts_at && (
                     <span style={{ color: T.gold, fontWeight: 700, fontSize: 12 }}>يبدأ: {new Date(auction.starts_at).toLocaleDateString("ar-IQ")}</span>
                   )}
