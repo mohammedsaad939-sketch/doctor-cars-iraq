@@ -1262,6 +1262,7 @@ const SellerDashScreen = ({ session }) => {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [editProduct, setEditProduct] = useState(null);
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState("");
 
   const user = session?.user;
 
@@ -1319,6 +1320,15 @@ const SellerDashScreen = ({ session }) => {
     setSaveError(null);
     setSaveSuccessMsg("");
     setShowAddModal(true);
+  };
+
+  const handleDelete = async (productId) => {
+    if (!window.confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
+    const { error } = await supabase.from("products").delete().eq("id", productId);
+    if (error) { alert(`فشل الحذف: ${error.message}`); return; }
+    setDeleteSuccessMsg("تم حذف المنتج بنجاح");
+    loadProducts(sellerId);
+    setTimeout(() => setDeleteSuccessMsg(""), 3000);
   };
 
   const handleSave = async () => {
@@ -1429,6 +1439,12 @@ const SellerDashScreen = ({ session }) => {
         </div>
       )}
 
+      {deleteSuccessMsg && (
+        <div style={{ background: `${T.red}22`, border: `1px solid ${T.red}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 12, color: T.red, fontSize: 13, fontWeight: 700 }}>
+          🗑️ {deleteSuccessMsg}
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
         {stats.map(stat => (
@@ -1533,7 +1549,7 @@ const SellerDashScreen = ({ session }) => {
                   <p style={{ margin: "0 0 8px", color: T.gold, fontSize: 13, fontWeight: 800 }}>{Number(p.price).toLocaleString("ar-IQ")} د.ع</p>
                   <div style={{ display: "flex", gap: 6 }}>
                     <Btn size="sm" variant="ghost" fullWidth onClick={() => handleEdit(p)}>تعديل</Btn>
-                    <Btn size="sm" variant="danger">🗑️</Btn>
+                    <Btn size="sm" variant="danger" onClick={() => handleDelete(p.id)}>🗑️</Btn>
                   </div>
                 </Card>
               ))}
