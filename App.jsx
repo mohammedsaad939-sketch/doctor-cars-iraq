@@ -615,6 +615,7 @@ const ShopScreen = ({ onProductView, onCartAdd }) => {
       if (!error && data) {
         setProducts(data.map(p => ({
           id: p.id,
+          seller_id: p.seller_id,
           name: p.name,
           price: p.price,
           oldPrice: p.old_price,
@@ -712,12 +713,19 @@ const ShopScreen = ({ onProductView, onCartAdd }) => {
 };
 
 // ── PRODUCT DETAIL SCREEN ──────────────────────────────────────
-const ProductDetailScreen = ({ product, onBack, onCartAdd }) => {
+const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile }) => {
   const [activeTab, setActiveTab] = useState("details");
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [checkoutForm, setCheckoutForm] = useState({ buyer_name: "", buyer_phone: "", buyer_address: "", city: "", notes: "" });
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState(null);
+  const [checkoutSuccess, setCheckoutSuccess] = useState(false);
 
   if (!product) return null;
+
+  const totalAmount = product.price * quantity;
 
   const handleAddCart = () => {
     onCartAdd(product);
@@ -725,8 +733,93 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd }) => {
     setTimeout(() => setAdded(false), 2000);
   };
 
+  const handleOpenCheckout = () => {
+    setCheckoutForm({
+      buyer_name: profile?.full_name || "",
+      buyer_phone: profile?.phone || "",
+      buyer_address: "",
+      city: profile?.city || "",
+      notes: "",
+    });
+    setCheckoutError(null);
+    setCheckoutSuccess(false);
+    setShowCheckout(true);
+  };
+
+  const handleCheckout = async () => {
+    if (!checkoutForm.buyer_phone.trim()) { setCheckoutError("رقم الهاتف مطلوب"); return; }
+    if (!checkoutForm.buyer_address.trim()) { setCheckoutError("العنوان التفصيلي مطلوب"); return; }
+    setCheckoutLoading(true);
+    setCheckoutError(null);
+    const { data: orderData, error: orderError } = await supabase.from("orders").insert({
+      buyer_id: session.user.id,
+      seller_id: product.seller_id,
+      payment_method: "cod",
+      total_amount: totalAmount,
+      buyer_name: checkoutForm.buyer_name.trim() || null,
+      buyer_phone: checkoutForm.buyer_phone.trim(),
+      buyer_address: checkoutForm.buyer_address.trim(),
+      city: checkoutForm.city.trim() || null,
+      notes: checkoutForm.notes.trim() || null,
+    }).select().single();
+    if (orderError) { setCheckoutError(orderError.message); setCheckoutLoading(false); return; }
+    const { error: itemsError } = await supabase.from("order_items").insert({
+      order_id: orderData.id,
+      product_id: product.id,
+      product_name: product.name,
+      quantity,
+      unit_price: product.price,
+    });
+    if (itemsError) { setCheckoutError(itemsError.message); setCheckoutLoading(false); return; }
+    setCheckoutLoading(false);
+    setCheckoutSuccess(true);
+  };
+
   return (
     <div style={{ padding: 0 }}>
+      <Modal isOpen={showCheckout} onClose={() => !checkoutLoading && setShowCheckout(false)} title="تأكيد الطلب 🛒">
+        {!session ? (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
+            <p style={{ color: T.textSecondary, fontSize: 14, margin: 0 }}>يرجى تسجيل الدخول أولاً للمتابعة في الشراء</p>
+          </div>
+        ) : checkoutSuccess ? (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+            <p style={{ color: T.green, fontSize: 15, fontWeight: 700, margin: 0, lineHeight: 1.7 }}>تم استلام طلبك! سيتواصل معك البائع لتأكيد التوصيل والدفع عند الاستلام</p>
+          </div>
+        ) : (
+          <>
+            <div style={{ background: T.navyLight, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ color: T.textSecondary, fontSize: 13 }}>{product.name}</span>
+                <span style={{ color: T.gold, fontWeight: 700 }}>{product.price.toLocaleString("ar-IQ")} د.ع</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: T.textMuted, fontSize: 12 }}>الكمية: {quantity}</span>
+                <span style={{ color: T.gold, fontWeight: 900 }}>الإجمالي: {totalAmount.toLocaleString("ar-IQ")} د.ع</span>
+              </div>
+            </div>
+            <Input label="الاسم" value={checkoutForm.buyer_name} onChange={v => setCheckoutForm(p => ({ ...p, buyer_name: v }))} placeholder="اسمك الكريم" icon="👤" />
+            <Input label="رقم الهاتف *" value={checkoutForm.buyer_phone} onChange={v => setCheckoutForm(p => ({ ...p, buyer_phone: v }))} placeholder="07xxxxxxxxx" icon="📱" type="tel" />
+            <Input label="العنوان التفصيلي *" value={checkoutForm.buyer_address} onChange={v => setCheckoutForm(p => ({ ...p, buyer_address: v }))} placeholder="الحي، الشارع، رقم المنزل" icon="📍" />
+            <Input label="المدينة" value={checkoutForm.city} onChange={v => setCheckoutForm(p => ({ ...p, city: v }))} placeholder="بغداد" icon="🌆" />
+            <Input label="ملاحظات" value={checkoutForm.notes} onChange={v => setCheckoutForm(p => ({ ...p, notes: v }))} placeholder="أي ملاحظات إضافية..." icon="📝" />
+            <div style={{ background: `${T.blue}22`, border: `1px solid ${T.blue}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 16 }}>
+              <span style={{ color: T.blue, fontSize: 12, fontWeight: 600 }}>💳 الدفع عند الاستلام (COD)</span>
+            </div>
+            {checkoutError && (
+              <div style={{ background: `${T.red}22`, border: `1px solid ${T.red}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 16, color: T.red, fontSize: 13, fontWeight: 700 }}>
+                ⚠️ {checkoutError}
+              </div>
+            )}
+            <Btn fullWidth onClick={handleCheckout} disabled={checkoutLoading} variant="primary">
+              {checkoutLoading ? "جارٍ إرسال الطلب..." : "تأكيد الطلب"}
+            </Btn>
+          </>
+        )}
+      </Modal>
+
       {/* Back Header */}
       <div style={{ padding: "16px 16px 0", display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <button onClick={onBack} style={{ background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 18, color: T.textPrimary }}>→</button>
@@ -850,6 +943,9 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd }) => {
             <Btn fullWidth onClick={handleAddCart} icon={added ? "✓" : "🛒"} variant={added ? "green" : "primary"}>
               {added ? "تمت الإضافة!" : "أضف للسلة"}
             </Btn>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <Btn fullWidth onClick={handleOpenCheckout} variant="blue" icon="🛍️">اشتري الآن</Btn>
           </div>
         </div>
       </div>
@@ -2289,7 +2385,7 @@ export default function DoctorCarsApp() {
       case "auctions": return <AuctionsScreen onNavigate={navigate} session={session} />;
       case "garage": return <GarageScreen />;
       case "profile": return <ProfileScreen onLogout={signOut} onNavigate={navigate} profile={profile} />;
-      case "productDetail": return <ProductDetailScreen product={selectedProduct} onBack={() => navigate(prevScreen)} onCartAdd={handleCartAdd} />;
+      case "productDetail": return <ProductDetailScreen product={selectedProduct} onBack={() => navigate(prevScreen)} onCartAdd={handleCartAdd} session={session} profile={profile} />;
       case "notifications": return <NotificationsScreen />;
       case "cart": return <CartScreen items={cartItems} onRemove={handleCartRemove} onNavigate={navigate} />;
       case "diagnosis": return <DiagnosisScreen />;
