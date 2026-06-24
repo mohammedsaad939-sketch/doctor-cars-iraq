@@ -1490,14 +1490,28 @@ const SellerDashScreen = ({ session }) => {
   const [sellerOrders, setSellerOrders] = useState([]);
   const [sellerOrdersLoading, setSellerOrdersLoading] = useState(false);
   const [orderStatusUpdating, setOrderStatusUpdating] = useState({});
+  const [sellerInfo, setSellerInfo] = useState(null);
+  const [sellerStats, setSellerStats] = useState({ pendingCount: 0, todayCount: 0, revenue: 0, rating: null });
 
   const user = session?.user;
 
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data } = await supabase.from("sellers").select("id").eq("owner_id", user.id).single();
-      if (data) { setSellerId(data.id); loadProducts(data.id); }
+      const { data } = await supabase.from("sellers").select("id, store_name, verified, rating").eq("owner_id", user.id).single();
+      if (data) {
+        setSellerId(data.id);
+        setSellerInfo(data);
+        loadProducts(data.id);
+        const today = new Date().toISOString().split("T")[0];
+        const [{ count: pendingCount }, { count: todayCount }, { data: revenueRows }] = await Promise.all([
+          supabase.from("orders").select("id", { count: "exact", head: true }).eq("seller_id", data.id).eq("status", "pending"),
+          supabase.from("orders").select("id", { count: "exact", head: true }).eq("seller_id", data.id).gte("created_at", today),
+          supabase.from("orders").select("total_amount").eq("seller_id", data.id),
+        ]);
+        const revenue = (revenueRows || []).reduce((s, r) => s + (r.total_amount || 0), 0);
+        setSellerStats({ pendingCount: pendingCount || 0, todayCount: todayCount || 0, revenue, rating: data.rating });
+      }
     })();
     (async () => {
       const { data } = await supabase.from("categories").select("id,name").order("sort_order");
@@ -1677,10 +1691,10 @@ const SellerDashScreen = ({ session }) => {
   };
 
   const stats = [
-    { label: "مبيعات اليوم", value: "١٢", icon: "📦", trend: "+15%" },
-    { label: "الإيرادات", value: "٨٥٠,٠٠٠", icon: "💰", trend: "+22%" },
-    { label: "طلبات جديدة", value: "٣", icon: "🔔", trend: "+3", urgent: true },
-    { label: "التقييم", value: "٤.٨", icon: "⭐", trend: "ثابت" },
+    { label: "مبيعات اليوم", value: sellerStats.todayCount.toLocaleString("ar-IQ"), icon: "📦" },
+    { label: "الإيرادات", value: sellerStats.revenue.toLocaleString("ar-IQ"), icon: "💰" },
+    { label: "طلبات جديدة", value: sellerStats.pendingCount.toLocaleString("ar-IQ"), icon: "🔔", urgent: true },
+    { label: "التقييم", value: sellerStats.rating != null ? sellerStats.rating.toFixed(1) : "—", icon: "⭐" },
   ];
 
   const orderStatusOptions = [
@@ -1696,9 +1710,9 @@ const SellerDashScreen = ({ session }) => {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
           <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 18, fontWeight: 800 }}>لوحة البائع 🏪</h2>
-          <p style={{ margin: 0, color: T.textSecondary, fontSize: 12 }}>محل النجار للغيار</p>
+          <p style={{ margin: 0, color: T.textSecondary, fontSize: 12 }}>{sellerInfo?.store_name || "..."}</p>
         </div>
-        <Badge color={T.green}>✓ موثق</Badge>
+        {sellerInfo?.verified && <Badge color={T.green}>✓ موثق</Badge>}
       </div>
 
       {saveSuccessMsg && (
@@ -1723,9 +1737,6 @@ const SellerDashScreen = ({ session }) => {
                 <p style={{ margin: 0, color: stat.urgent ? T.red : T.gold, fontWeight: 900, fontSize: 22 }}>{stat.value}</p>
               </div>
               <span style={{ fontSize: 24 }}>{stat.icon}</span>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <Badge small color={stat.trend.includes("+") ? T.green : T.textMuted}>{stat.trend}</Badge>
             </div>
           </Card>
         ))}
