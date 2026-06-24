@@ -722,6 +722,17 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile }) =
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState(null);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+  const [sellerInfo, setSellerInfo] = useState(null);
+  const [sellerProductCount, setSellerProductCount] = useState(null);
+
+  useEffect(() => {
+    if (!product?.seller_id) return;
+    const sid = product.seller_id;
+    supabase.from("sellers").select("store_name, verified, rating, created_at").eq("id", sid).single()
+      .then(({ data }) => setSellerInfo(data || null));
+    supabase.from("products").select("id", { count: "exact", head: true }).eq("seller_id", sid)
+      .then(({ count }) => setSellerProductCount(count || 0));
+  }, [product?.seller_id]);
 
   if (!product) return null;
 
@@ -883,15 +894,22 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile }) =
               <div style={{ width: 56, height: 56, borderRadius: 16, background: T.navyLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>🏪</div>
               <div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <span style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{product.seller}</span>
-                  <Badge small color={T.green}>✓ موثق</Badge>
+                  <span style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{sellerInfo?.store_name || product.seller || "—"}</span>
+                  {sellerInfo?.verified && <Badge small color={T.green}>✓ موثق</Badge>}
                 </div>
-                <Stars rating={4.8} size={12} />
-                <span style={{ color: T.textMuted, fontSize: 12 }}> ٤.٨ (١٢٤ تقييم)</span>
+                {sellerInfo?.rating != null && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <Stars rating={sellerInfo.rating} size={12} />
+                    <span style={{ color: T.textMuted, fontSize: 12 }}> {sellerInfo.rating.toFixed(1)}</span>
+                  </div>
+                )}
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-              {[["المبيعات", "٢٣٤٠"], ["المنتجات", "٤٥٠"], ["منذ", "٢٠١٥"], ["الاستجابة", "< ١ ساعة"]].map(([l, v]) => (
+              {[
+                ["المنتجات", sellerProductCount != null ? sellerProductCount.toLocaleString("ar-IQ") : "—"],
+                ["منذ", sellerInfo?.created_at ? new Date(sellerInfo.created_at).getFullYear().toString() : "—"],
+              ].map(([l, v]) => (
                 <div key={l} style={{ textAlign: "center", background: T.navyLight, borderRadius: 10, padding: 10 }}>
                   <div style={{ color: T.gold, fontWeight: 800, fontSize: 16 }}>{v}</div>
                   <div style={{ color: T.textMuted, fontSize: 11 }}>{l}</div>
