@@ -2586,7 +2586,7 @@ const PartRequestScreen = () => {
           <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
           <h3 style={{ margin: "0 0 8px", color: T.green }}>تم إرسال طلبك!</h3>
           <p style={{ color: T.textSecondary, margin: "0 0 20px", lineHeight: 1.6 }}>
-            تم إرسال طلبك لـ <span style={{ color: T.gold, fontWeight: 700 }}>١,٢٤٠ بائع</span> في منطقتك. ستصلك عروض الأسعار قريباً.
+            تم استلام طلبك، سنقوم بإشعار البائعين المناسبين. ستصلك عروض الأسعار قريباً.
           </p>
           <Btn onClick={() => setSubmitted(false)} variant="secondary">طلب جديد</Btn>
         </Card>
