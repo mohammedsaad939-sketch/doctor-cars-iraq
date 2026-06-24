@@ -2712,8 +2712,10 @@ export default function DoctorCarsApp() {
           {bottomNav.map(item => {
             const isActive = currentScreen === item.id;
             return (
-              <button key={item.id} onClick={() => navigate(item.id)} style={{ flex: 1, background: "none", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "pointer", padding: "4px 0", transition: "all 0.2s" }}>
-                {item.id === "shop" && cartItems.length > 0 && item.id === "cart" ? null : null}
+              <button key={item.id} onClick={() => navigate(item.id)} style={{ flex: 1, background: "none", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "pointer", padding: "4px 0", transition: "all 0.2s", position: "relative" }}>
+                {item.id === "shop" && cartBadgeCount > 0 && (
+                  <span style={{ position: "absolute", top: 2, right: "50%", transform: "translateX(8px)", minWidth: 16, height: 16, background: T.gold, color: T.navy, borderRadius: 8, fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{cartBadgeCount}</span>
+                )}
                 <span style={{ fontSize: 22, opacity: isActive ? 1 : 0.5, transform: isActive ? "scale(1.2)" : "scale(1)", transition: "all 0.2s", display: "block" }}>{item.icon}</span>
                 <span style={{ fontSize: 10, color: isActive ? T.gold : T.textMuted, fontFamily: "inherit", fontWeight: isActive ? 700 : 400, transition: "color 0.2s" }}>{item.label}</span>
                 {isActive && <div style={{ width: 4, height: 4, borderRadius: "50%", background: T.gold, marginTop: 1 }} />}
