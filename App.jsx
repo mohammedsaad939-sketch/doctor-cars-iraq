@@ -2236,10 +2236,17 @@ const CartScreen = ({ session, onNavigate, onCartCountChange, profile }) => {
     setCheckoutError(null);
     try {
       const uid = session.user.id;
+      for (const item of cartItems) {
+        if (!item.products) {
+          throw new Error(`بيانات المنتج مفقودة — يرجى تحديث السلة وإعادة المحاولة`);
+        }
+        if (!item.products.seller_id) {
+          throw new Error(`المنتج "${item.products.name || item.product_id}" غير مرتبط ببائع — لا يمكن إتمام الطلب`);
+        }
+      }
       const grouped = {};
       for (const item of cartItems) {
-        const sid = item.products?.seller_id;
-        if (!sid) continue;
+        const sid = item.products.seller_id;
         if (!grouped[sid]) grouped[sid] = [];
         grouped[sid].push(item);
       }
