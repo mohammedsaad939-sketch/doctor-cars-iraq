@@ -2629,8 +2629,14 @@ export default function DoctorCarsApp() {
       setTimeout(() => setCartToast(null), 3000);
       return;
     }
-    const uid = session.user.id;
     const pid = product.id;
+    const isUUID = pid && typeof pid === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pid);
+    if (!isUUID) {
+      setCartToast({ msg: "هذا المنتج غير متوفر في المتجر الإلكتروني حالياً", isError: true });
+      setTimeout(() => setCartToast(null), 3000);
+      return;
+    }
+    const uid = session.user.id;
     const { data: existing } = await supabase.from("cart_items").select("id, quantity")
       .eq("user_id", uid).eq("product_id", pid).maybeSingle();
     if (existing) {
