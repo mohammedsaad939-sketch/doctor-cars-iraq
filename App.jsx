@@ -1487,6 +1487,9 @@ const SellerDashScreen = ({ session }) => {
   const [imagePreview, setImagePreview] = useState(null);
   const [editProduct, setEditProduct] = useState(null);
   const [deleteSuccessMsg, setDeleteSuccessMsg] = useState("");
+  const [sellerOrders, setSellerOrders] = useState([]);
+  const [sellerOrdersLoading, setSellerOrdersLoading] = useState(false);
+  const [orderStatusUpdating, setOrderStatusUpdating] = useState({});
 
   const user = session?.user;
 
@@ -1508,6 +1511,24 @@ const SellerDashScreen = ({ session }) => {
     setProducts(data || []);
     setProductsLoading(false);
   };
+
+  const loadSellerOrders = async (sid) => {
+    setSellerOrdersLoading(true);
+    const { data } = await supabase.from("orders").select("*, order_items(*)").eq("seller_id", sid).order("created_at", { ascending: false });
+    setSellerOrders(data || []);
+    setSellerOrdersLoading(false);
+  };
+
+  const handleUpdateStatus = async (orderId, newStatus) => {
+    setOrderStatusUpdating(p => ({ ...p, [orderId]: true }));
+    await supabase.from("orders").update({ status: newStatus }).eq("id", orderId);
+    setSellerOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+    setOrderStatusUpdating(p => ({ ...p, [orderId]: false }));
+  };
+
+  useEffect(() => {
+    if (activeTab === "orders" && sellerId) loadSellerOrders(sellerId);
+  }, [activeTab, sellerId]);
 
   const selectedCat = categories.find(c => String(c.id) === String(form.category_id));
   const isCarCategory = selectedCat?.name?.includes("سيارات");
@@ -1662,13 +1683,13 @@ const SellerDashScreen = ({ session }) => {
     { label: "التقييم", value: "٤.٨", icon: "⭐", trend: "ثابت" },
   ];
 
-  const orders = [
-    { id: "#١٠٢٣", product: "فلتر هواء تويوتا", customer: "علي محمد", amount: 15000, status: "جديد", time: "٥ دقائق" },
-    { id: "#١٠٢٢", product: "زيت محرك Shell", customer: "أحمد كريم", amount: 35000, status: "قيد التوصيل", time: "ساعة" },
-    { id: "#١٠٢١", product: "فلاتر كيا", customer: "محمد علي", amount: 45000, status: "مكتمل", time: "أمس" },
+  const orderStatusOptions = [
+    { value: "pending", label: "قيد الانتظار", color: T.orange },
+    { value: "confirmed", label: "تم التأكيد", color: T.blue },
+    { value: "shipped", label: "تم الشحن", color: T.gold },
+    { value: "delivered", label: "تم التسليم", color: T.green },
+    { value: "cancelled", label: "ملغي", color: T.red },
   ];
-
-  const statusColors = { "جديد": T.red, "قيد التوصيل": T.orange, "مكتمل": T.green };
 
   return (
     <div style={{ padding: 16 }}>
@@ -1748,25 +1769,45 @@ const SellerDashScreen = ({ session }) => {
 
       {activeTab === "orders" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {orders.map(order => (
-            <Card key={order.id}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ color: T.gold, fontWeight: 700, fontSize: 14 }}>{order.id}</span>
-                <Badge small color={statusColors[order.status]}>{order.status}</Badge>
-              </div>
-              <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 14, fontWeight: 600 }}>{order.product}</p>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ color: T.textSecondary, fontSize: 12 }}>👤 {order.customer} | ⏱️ {order.time}</span>
-                <span style={{ color: T.gold, fontWeight: 800 }}>{order.amount.toLocaleString("ar-IQ")} د.ع</span>
-              </div>
-              {order.status === "جديد" && (
-                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                  <Btn size="sm" variant="green" fullWidth>✓ قبول</Btn>
-                  <Btn size="sm" variant="danger" fullWidth>✕ رفض</Btn>
+          {sellerOrdersLoading ? (
+            <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>جارٍ التحميل...</div>
+          ) : sellerOrders.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 40 }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
+              <p style={{ color: T.textMuted, margin: 0 }}>لا توجد طلبات بعد</p>
+            </div>
+          ) : sellerOrders.map(order => {
+            const statusInfo = orderStatusOptions.find(s => s.value === order.status) || { label: order.status, color: T.textMuted };
+            const itemNames = order.order_items?.map(i => i.product_name).join("، ") || "—";
+            const date = new Date(order.created_at).toLocaleDateString("ar-IQ");
+            return (
+              <Card key={order.id}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ color: T.textMuted, fontSize: 12 }}>{date}</span>
+                  <Badge small color={statusInfo.color}>{statusInfo.label}</Badge>
                 </div>
-              )}
-            </Card>
-          ))}
+                <p style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 14, fontWeight: 700 }}>{itemNames}</p>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                  <span style={{ color: T.textMuted, fontSize: 12 }}>الكمية: {order.order_items?.reduce((s, i) => s + i.quantity, 0) || 0}</span>
+                  <span style={{ color: T.gold, fontWeight: 800 }}>{order.total_amount?.toLocaleString("ar-IQ")} د.ع</span>
+                </div>
+                <div style={{ background: T.navyLight, borderRadius: 10, padding: "10px 12px", marginBottom: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                  {order.buyer_name && <span style={{ color: T.textSecondary, fontSize: 12 }}>👤 {order.buyer_name}</span>}
+                  <span style={{ color: T.textSecondary, fontSize: 12 }}>📱 {order.buyer_phone}</span>
+                  <span style={{ color: T.textSecondary, fontSize: 12 }}>📍 {order.buyer_address}{order.city ? ` — ${order.city}` : ""}</span>
+                  {order.notes && <span style={{ color: T.textMuted, fontSize: 11 }}>📝 {order.notes}</span>}
+                </div>
+                <select
+                  value={order.status}
+                  disabled={!!orderStatusUpdating[order.id]}
+                  onChange={e => handleUpdateStatus(order.id, e.target.value)}
+                  style={{ width: "100%", background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 8, padding: "8px 12px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, cursor: "pointer", outline: "none" }}
+                >
+                  {orderStatusOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </Card>
+            );
+          })}
         </div>
       )}
 
