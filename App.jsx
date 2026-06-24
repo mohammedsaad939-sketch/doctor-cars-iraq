@@ -1161,7 +1161,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
 };
 
 // ── DIAGNOSIS SCREEN ──────────────────────────────────────
-const DiagnosisScreen = () => {
+const DiagnosisScreen = ({ onCartAdd, session }) => {
   const [step, setStep] = useState(1);
   const [vehicle, setVehicle] = useState("");
   const [symptoms, setSymptoms] = useState([]);
@@ -1302,7 +1302,7 @@ const DiagnosisScreen = () => {
 
           <Section title="قطع مقترحة بالقرب منك" subtitle="بناءً على التشخيص">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {result.relatedSellers.map(p => <ProductCard key={p.id} product={p} onView={() => {}} onCart={() => {}} />)}
+              {result.relatedSellers.map(p => <ProductCard key={p.id} product={p} onView={() => {}} onCart={onCartAdd || (() => {})} />)}
             </div>
           </Section>
 
@@ -2425,7 +2425,8 @@ export default function DoctorCarsApp() {
   const { session, profile, loading, authError, signUp, signIn, signOut, signInWithOAuth } = useAuth();
   const [currentScreen, setCurrentScreen] = useState("home");
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [cartItems, setCartItems] = useState([]);
+  const [cartBadgeCount, setCartBadgeCount] = useState(0);
+  const [cartToast, setCartToast] = useState(null);
   const [prevScreen, setPrevScreen] = useState("home");
   const [userMode, setUserMode] = useState("buyer"); // buyer | seller | admin
 
@@ -2439,12 +2440,31 @@ export default function DoctorCarsApp() {
     navigate("productDetail");
   };
 
-  const handleCartAdd = (product) => {
-    setCartItems(prev => [...prev, product]);
-  };
+  useEffect(() => {
+    if (!session?.user) { setCartBadgeCount(0); return; }
+    supabase.from("cart_items").select("id", { count: "exact", head: true }).eq("user_id", session.user.id)
+      .then(({ count }) => setCartBadgeCount(count || 0));
+  }, [session?.user?.id]);
 
-  const handleCartRemove = (index) => {
-    setCartItems(prev => prev.filter((_, i) => i !== index));
+  const handleCartAdd = async (product) => {
+    if (!session?.user) {
+      setCartToast({ msg: "يرجى تسجيل الدخول أولاً لإضافة المنتجات للسلة", isError: true });
+      setTimeout(() => setCartToast(null), 3000);
+      return;
+    }
+    const uid = session.user.id;
+    const pid = product.id;
+    const { data: existing } = await supabase.from("cart_items").select("id, quantity")
+      .eq("user_id", uid).eq("product_id", pid).maybeSingle();
+    if (existing) {
+      await supabase.from("cart_items").update({ quantity: existing.quantity + 1 }).eq("id", existing.id);
+    } else {
+      await supabase.from("cart_items").insert({ user_id: uid, product_id: pid, quantity: 1 });
+    }
+    const { count } = await supabase.from("cart_items").select("id", { count: "exact", head: true }).eq("user_id", uid);
+    setCartBadgeCount(count || 0);
+    setCartToast({ msg: "تمت إضافة المنتج للسلة ✓" });
+    setTimeout(() => setCartToast(null), 2000);
   };
 
   const bottomNav = [
@@ -2479,22 +2499,22 @@ export default function DoctorCarsApp() {
 
   const renderScreen = () => {
     switch (currentScreen) {
-      case "home": return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartItems.length} />;
+      case "home": return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} />;
       case "shop": return <ShopScreen onProductView={handleProductView} onCartAdd={handleCartAdd} />;
       case "auctions": return <AuctionsScreen onNavigate={navigate} session={session} />;
       case "garage": return <GarageScreen />;
-      case "profile": return <ProfileScreen onLogout={signOut} onNavigate={navigate} profile={profile} />;
+      case "profile": return <ProfileScreen onLogout={signOut} onNavigate={navigate} profile={profile} session={session} />;
       case "productDetail": return <ProductDetailScreen product={selectedProduct} onBack={() => navigate(prevScreen)} onCartAdd={handleCartAdd} session={session} profile={profile} />;
       case "notifications": return <NotificationsScreen />;
-      case "cart": return <CartScreen items={cartItems} onRemove={handleCartRemove} onNavigate={navigate} />;
-      case "diagnosis": return <DiagnosisScreen />;
+      case "cart": return <CartScreen session={session} onNavigate={navigate} onCartCountChange={setCartBadgeCount} profile={profile} />;
+      case "diagnosis": return <DiagnosisScreen onCartAdd={handleCartAdd} session={session} />;
       case "emergency": return <EmergencyScreen />;
       case "request": return <PartRequestScreen />;
       case "academy": return <AcademyScreen />;
       case "sellerDash": return <SellerDashScreen session={session} />;
       case "myOrders": return <MyOrdersScreen session={session} />;
       case "admin": return <AdminScreen />;
-      default: return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartItems.length} />;
+      default: return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} />;
     }
   };
 
@@ -2563,6 +2583,13 @@ export default function DoctorCarsApp() {
             );
           })}
         </nav>
+      )}
+
+      {/* CART TOAST */}
+      {cartToast && (
+        <div style={{ position: "fixed", bottom: 120, left: "50%", transform: "translateX(-50%)", zIndex: 500, background: cartToast.isError ? T.red : T.green, color: "#fff", borderRadius: 12, padding: "10px 20px", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", boxShadow: "0 4px 16px #0006" }}>
+          {cartToast.msg}
+        </div>
       )}
 
       {/* ROLE SWITCHER (demo only) */}
