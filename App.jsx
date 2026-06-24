@@ -2473,7 +2473,13 @@ const MyOrdersScreen = ({ session }) => {
 };
 
 // ── PROFILE SCREEN ──────────────────────────────────────
-const ProfileScreen = ({ onLogout, onNavigate, profile }) => {
+const ProfileScreen = ({ onLogout, onNavigate, profile, session }) => {
+  const [ordersCount, setOrdersCount] = useState(null);
+  useEffect(() => {
+    if (!session?.user) return;
+    supabase.from("orders").select("id", { count: "exact", head: true }).eq("buyer_id", session.user.id)
+      .then(({ count }) => setOrdersCount(count || 0));
+  }, [session?.user?.id]);
   const menuItems = [
     { icon: "🚗", label: "مركباتي", action: () => onNavigate("garage") },
     { icon: "📦", label: "طلباتي", action: () => onNavigate("myOrders") },
@@ -2501,7 +2507,7 @@ const ProfileScreen = ({ onLogout, onNavigate, profile }) => {
           {profile?.verified ? <Badge color={T.green}>موثق ✓</Badge> : <Badge color={T.textMuted}>غير موثق</Badge>}
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-          {[["٠", "طلباتي"], ["٠", "مراجعاتي"], ["٠", "مفضلاتي"]].map(([v, l]) => (
+          {[[ordersCount != null ? ordersCount.toLocaleString("ar-IQ") : "٠", "طلباتي"], ["٠", "مراجعاتي"], ["٠", "مفضلاتي"]].map(([v, l]) => (
             <div key={l} style={{ flex: 1, background: T.navyMid, borderRadius: 10, padding: 10 }}>
               <div style={{ color: T.gold, fontWeight: 900, fontSize: 18 }}>{v}</div>
               <div style={{ color: T.textMuted, fontSize: 10 }}>{l}</div>
