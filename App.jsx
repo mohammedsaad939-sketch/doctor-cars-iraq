@@ -2208,8 +2208,12 @@ const CartScreen = ({ session, onNavigate, onCartCountChange, profile }) => {
 
   const removeItem = async (item) => {
     setUpdating(p => ({ ...p, [item.id]: true }));
-    await supabase.from("cart_items").delete().eq("id", item.id);
-    await loadCart();
+    try {
+      await supabase.from("cart_items").delete().eq("id", item.id);
+      await loadCart();
+    } finally {
+      setUpdating(p => ({ ...p, [item.id]: false }));
+    }
   };
 
   const total = cartItems.reduce((sum, item) => sum + (item.products?.price || 0) * item.quantity, 0);
