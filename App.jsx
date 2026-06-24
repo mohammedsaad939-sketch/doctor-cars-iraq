@@ -416,15 +416,19 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount }) => {
   const [searchText, setSearchText] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [activeAuction, setActiveAuction] = useState(0);
+  const [cityFilter, setCityFilter] = useState("الكل");
 
   useEffect(() => {
     const timer = setInterval(() => setActiveAuction(p => (p + 1) % MOCK.auctions.length), 5000);
     return () => clearInterval(timer);
   }, []);
 
-  const filteredProducts = searchText
-    ? MOCK.products.filter(p => p.name.includes(searchText) || p.category.includes(searchText))
-    : MOCK.products;
+  const filteredProducts = (() => {
+    let base = MOCK.products;
+    if (cityFilter !== "الكل") base = base.filter(p => p.city === cityFilter);
+    if (searchText) base = base.filter(p => p.name.includes(searchText) || p.category.includes(searchText));
+    return base;
+  })();
 
   return (
     <div style={{ padding: "0 0 20px" }}>
@@ -471,7 +475,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount }) => {
         {/* QUICK FILTERS */}
         <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 12, marginBottom: 4 }}>
           {["الكل", "بغداد", "البصرة", "أربيل", "النجف", "كربلاء", "الموصل"].map(city => (
-            <button key={city} style={{ background: city === "الكل" ? `linear-gradient(135deg, ${T.gold}, ${T.goldDark})` : T.navyCard, border: `1px solid ${city === "الكل" ? "transparent" : T.navyBorder}`, borderRadius: 20, padding: "6px 14px", color: city === "الكل" ? T.navy : T.textSecondary, fontFamily: "inherit", fontWeight: 600, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>
+            <button key={city} onClick={() => setCityFilter(city === "الكل" ? "الكل" : city)} style={{ background: cityFilter === city || (city === "الكل" && cityFilter === "الكل") ? `linear-gradient(135deg, ${T.gold}, ${T.goldDark})` : T.navyCard, border: `1px solid ${cityFilter === city ? "transparent" : T.navyBorder}`, borderRadius: 20, padding: "6px 14px", color: cityFilter === city ? T.navy : T.textSecondary, fontFamily: "inherit", fontWeight: 600, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>
               {city}
             </button>
           ))}
@@ -551,7 +555,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount }) => {
             )
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {MOCK.products.slice(0, 4).map(p => <ProductCard key={p.id} product={p} onView={onProductView} onCart={onCartAdd} />)}
+              {filteredProducts.slice(0, 4).map(p => <ProductCard key={p.id} product={p} onView={onProductView} onCart={onCartAdd} />)}
             </div>
           )}
         </Section>
