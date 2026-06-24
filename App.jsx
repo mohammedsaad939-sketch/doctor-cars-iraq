@@ -2639,10 +2639,18 @@ export default function DoctorCarsApp() {
     const uid = session.user.id;
     const { data: existing } = await supabase.from("cart_items").select("id, quantity")
       .eq("user_id", uid).eq("product_id", pid).maybeSingle();
+    let writeError;
     if (existing) {
-      await supabase.from("cart_items").update({ quantity: existing.quantity + 1 }).eq("id", existing.id);
+      const { error } = await supabase.from("cart_items").update({ quantity: existing.quantity + 1 }).eq("id", existing.id);
+      writeError = error;
     } else {
-      await supabase.from("cart_items").insert({ user_id: uid, product_id: pid, quantity: 1 });
+      const { error } = await supabase.from("cart_items").insert({ user_id: uid, product_id: pid, quantity: 1 });
+      writeError = error;
+    }
+    if (writeError) {
+      setCartToast({ msg: writeError.message || "حدث خطأ أثناء إضافة المنتج للسلة", isError: true });
+      setTimeout(() => setCartToast(null), 3000);
+      return;
     }
     const { count } = await supabase.from("cart_items").select("id", { count: "exact", head: true }).eq("user_id", uid);
     setCartBadgeCount(count || 0);
