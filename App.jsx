@@ -2647,20 +2647,27 @@ export default function DoctorCarsApp() {
       return;
     }
     const uid = session.user.id;
-    const { data: existing } = await supabase.from("cart_items").select("id, quantity")
-      .eq("user_id", uid).eq("product_id", pid).maybeSingle();
-    let writeError;
-    if (existing) {
-      const { error } = await supabase.from("cart_items").update({ quantity: existing.quantity + 1 }).eq("id", existing.id);
-      writeError = error;
-    } else {
-      const { error } = await supabase.from("cart_items").insert({ user_id: uid, product_id: pid, quantity: 1 });
-      writeError = error;
-    }
-    if (writeError) {
-      setCartToast({ msg: writeError.message || "حدث خطأ أثناء إضافة المنتج للسلة", isError: true });
-      setTimeout(() => setCartToast(null), 3000);
-      return;
+    const { error: insertError } = await supabase.from("cart_items").insert({ user_id: uid, product_id: pid, quantity: 1 });
+    if (insertError) {
+      const isUniqueViolation = insertError.code === "23505" || (insertError.message || "").includes("duplicate");
+      if (!isUniqueViolation) {
+        setCartToast({ msg: insertError.message || "حدث خطأ أثناء إضافة المنتج للسلة", isError: true });
+        setTimeout(() => setCartToast(null), 3000);
+        return;
+      }
+      const { data: row, error: fetchError } = await supabase.from("cart_items").select("id, quantity")
+        .eq("user_id", uid).eq("product_id", pid).single();
+      if (fetchError || !row) {
+        setCartToast({ msg: "حدث خطأ أثناء تحديث الكمية في السلة", isError: true });
+        setTimeout(() => setCartToast(null), 3000);
+        return;
+      }
+      const { error: updateError } = await supabase.from("cart_items").update({ quantity: row.quantity + 1 }).eq("id", row.id);
+      if (updateError) {
+        setCartToast({ msg: updateError.message || "حدث خطأ أثناء تحديث الكمية في السلة", isError: true });
+        setTimeout(() => setCartToast(null), 3000);
+        return;
+      }
     }
     const { count } = await supabase.from("cart_items").select("id", { count: "exact", head: true }).eq("user_id", uid);
     setCartBadgeCount(count || 0);
