@@ -766,28 +766,31 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile }) =
     if (!checkoutForm.buyer_address.trim()) { setCheckoutError("العنوان التفصيلي مطلوب"); return; }
     setCheckoutLoading(true);
     setCheckoutError(null);
-    const { data: orderData, error: orderError } = await supabase.from("orders").insert({
-      buyer_id: session.user.id,
-      seller_id: product.seller_id,
-      payment_method: "cod",
-      total_amount: totalAmount,
-      buyer_name: checkoutForm.buyer_name.trim() || null,
-      buyer_phone: checkoutForm.buyer_phone.trim(),
-      buyer_address: checkoutForm.buyer_address.trim(),
-      city: checkoutForm.city.trim() || null,
-      notes: checkoutForm.notes.trim() || null,
-    }).select().single();
-    if (orderError) { setCheckoutError(orderError.message); setCheckoutLoading(false); return; }
-    const { error: itemsError } = await supabase.from("order_items").insert({
-      order_id: orderData.id,
-      product_id: product.id,
-      product_name: product.name,
-      quantity,
-      unit_price: product.price,
-    });
-    if (itemsError) { setCheckoutError(itemsError.message); setCheckoutLoading(false); return; }
-    setCheckoutLoading(false);
-    setCheckoutSuccess(true);
+    try {
+      const { data: orderData, error: orderError } = await supabase.from("orders").insert({
+        buyer_id: session.user.id,
+        seller_id: product.seller_id,
+        payment_method: "cod",
+        total_amount: totalAmount,
+        buyer_name: checkoutForm.buyer_name.trim() || null,
+        buyer_phone: checkoutForm.buyer_phone.trim(),
+        buyer_address: checkoutForm.buyer_address.trim(),
+        city: checkoutForm.city.trim() || null,
+        notes: checkoutForm.notes.trim() || null,
+      }).select().single();
+      if (orderError) { setCheckoutError(orderError.message); return; }
+      const { error: itemsError } = await supabase.from("order_items").insert({
+        order_id: orderData.id,
+        product_id: product.id,
+        product_name: product.name,
+        quantity,
+        unit_price: product.price,
+      });
+      if (itemsError) { setCheckoutError(itemsError.message); return; }
+      setCheckoutSuccess(true);
+    } finally {
+      setCheckoutLoading(false);
+    }
   };
 
   return (
