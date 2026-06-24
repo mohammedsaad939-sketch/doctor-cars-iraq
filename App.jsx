@@ -2202,11 +2202,69 @@ const AcademyScreen = () => {
   );
 };
 
+// ── MY ORDERS SCREEN ──────────────────────────────────────
+const MyOrdersScreen = ({ session }) => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const statusMap = {
+    pending: { label: "قيد الانتظار", color: T.orange },
+    confirmed: { label: "تم التأكيد", color: T.blue },
+    shipped: { label: "تم الشحن", color: T.gold },
+    delivered: { label: "تم التسليم", color: T.green },
+    cancelled: { label: "ملغي", color: T.red },
+  };
+
+  useEffect(() => {
+    if (!session?.user) return;
+    (async () => {
+      const { data } = await supabase.from("orders").select("*, order_items(*)").eq("buyer_id", session.user.id).order("created_at", { ascending: false });
+      setOrders(data || []);
+      setLoading(false);
+    })();
+  }, [session?.user?.id]);
+
+  return (
+    <div style={{ padding: 16 }}>
+      <h2 style={{ margin: "0 0 16px", color: T.textPrimary, fontSize: 20, fontWeight: 800 }}>📦 طلباتي</h2>
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>جارٍ التحميل...</div>
+      ) : orders.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
+          <p style={{ color: T.textMuted, margin: 0 }}>لا توجد طلبات بعد</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {orders.map(order => {
+            const status = statusMap[order.status] || { label: order.status, color: T.textMuted };
+            const itemNames = order.order_items?.map(i => i.product_name).join("، ") || "—";
+            const date = new Date(order.created_at).toLocaleDateString("ar-IQ");
+            return (
+              <Card key={order.id}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ color: T.textMuted, fontSize: 12 }}>{date}</span>
+                  <Badge color={status.color}>{status.label}</Badge>
+                </div>
+                <p style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 14, fontWeight: 700 }}>{itemNames}</p>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: T.textMuted, fontSize: 12 }}>الكمية: {order.order_items?.reduce((s, i) => s + i.quantity, 0) || 0}</span>
+                  <span style={{ color: T.gold, fontWeight: 800 }}>{order.total_amount?.toLocaleString("ar-IQ")} د.ع</span>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── PROFILE SCREEN ──────────────────────────────────────
 const ProfileScreen = ({ onLogout, onNavigate, profile }) => {
   const menuItems = [
     { icon: "🚗", label: "مركباتي", action: () => onNavigate("garage") },
-    { icon: "📦", label: "طلباتي", action: () => {} },
+    { icon: "📦", label: "طلباتي", action: () => onNavigate("myOrders") },
     { icon: "❤️", label: "المفضلة", action: () => {} },
     { icon: "💬", label: "رسائلي", action: () => {} },
     { icon: "💳", label: "طرق الدفع", action: () => {} },
@@ -2376,7 +2434,7 @@ export default function DoctorCarsApp() {
     );
   }
 
-  const screensWithBack = ["productDetail", "notifications", "cart", "diagnosis", "emergency", "request", "academy", "sellerDash", "admin", "sellerProfile"];
+  const screensWithBack = ["productDetail", "notifications", "cart", "diagnosis", "emergency", "request", "academy", "sellerDash", "admin", "sellerProfile", "myOrders"];
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -2393,6 +2451,7 @@ export default function DoctorCarsApp() {
       case "request": return <PartRequestScreen />;
       case "academy": return <AcademyScreen />;
       case "sellerDash": return <SellerDashScreen session={session} />;
+      case "myOrders": return <MyOrdersScreen session={session} />;
       case "admin": return <AdminScreen />;
       default: return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartItems.length} />;
     }
@@ -2418,9 +2477,9 @@ export default function DoctorCarsApp() {
         <div style={{ position: "sticky", top: 0, zIndex: 100, background: `${T.navy}EE`, backdropFilter: "blur(10px)", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, borderBottom: `1px solid ${T.navyBorder}` }}>
           <button onClick={() => navigate(prevScreen)} style={{ background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: T.textPrimary, fontSize: 18 }}>→</button>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: 18 }}>{{ productDetail: "🔧", notifications: "🔔", cart: "🛒", diagnosis: "🤖", emergency: "🚨", request: "📋", academy: "🎓", sellerDash: "🏪", admin: "🛡️", sellerProfile: "🏬" }[currentScreen]}</span>
+            <span style={{ fontSize: 18 }}>{{ productDetail: "🔧", notifications: "🔔", cart: "🛒", diagnosis: "🤖", emergency: "🚨", request: "📋", academy: "🎓", sellerDash: "🏪", admin: "🛡️", sellerProfile: "🏬", myOrders: "📦" }[currentScreen]}</span>
             <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16 }}>
-              {{ productDetail: "تفاصيل المنتج", notifications: "الإشعارات", cart: "السلة", diagnosis: "تشخيص الأعطال", emergency: "خدمات الطوارئ", request: "طلب قطعة", academy: "الأكاديمية", sellerDash: "لوحة البائع", admin: "لوحة الإدارة", sellerProfile: "ملف البائع" }[currentScreen]}
+              {{ productDetail: "تفاصيل المنتج", notifications: "الإشعارات", cart: "السلة", diagnosis: "تشخيص الأعطال", emergency: "خدمات الطوارئ", request: "طلب قطعة", academy: "الأكاديمية", sellerDash: "لوحة البائع", admin: "لوحة الإدارة", sellerProfile: "ملف البائع", myOrders: "طلباتي" }[currentScreen]}
             </span>
           </div>
         </div>
