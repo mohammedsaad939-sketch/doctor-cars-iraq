@@ -988,6 +988,48 @@ const AuctionsScreen = ({ onNavigate, session }) => {
   const [bidAmount, setBidAmount] = useState({});
   const [bidState, setBidState] = useState({}); // { [auctionId]: { loading, success, error } }
   const [lastBidsMap, setLastBidsMap] = useState({}); // { [auctionId]: { bidder_id } }
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState({ title: "", description: "", starting_price: "", min_increment: "", starts_at: "", ends_at: "" });
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState(null);
+  const [createSuccess, setCreateSuccess] = useState(false);
+
+  const handleOpenCreate = () => {
+    if (!user) { setCreateError("يجب تسجيل الدخول أولاً"); setShowCreateModal(true); return; }
+    setCreateForm({ title: "", description: "", starting_price: "", min_increment: "", starts_at: "", ends_at: "" });
+    setCreateError(null);
+    setCreateSuccess(false);
+    setShowCreateModal(true);
+  };
+
+  const handleCreateAuction = async () => {
+    if (!createForm.title.trim()) { setCreateError("اسم المزاد مطلوب"); return; }
+    if (!createForm.starting_price || isNaN(Number(createForm.starting_price))) { setCreateError("السعر الابتدائي مطلوب"); return; }
+    if (!createForm.starts_at) { setCreateError("تاريخ البداية مطلوب"); return; }
+    if (!createForm.ends_at) { setCreateError("تاريخ النهاية مطلوب"); return; }
+    if (new Date(createForm.ends_at) <= new Date(createForm.starts_at)) { setCreateError("تاريخ النهاية يجب أن يكون بعد البداية"); return; }
+    setCreating(true);
+    setCreateError(null);
+    const { data: sellerRow } = await supabase.from("sellers").select("id").eq("owner_id", user.id).maybeSingle();
+    if (!sellerRow) { setCreateError("يجب أن يكون لديك حساب بائع لإنشاء مزاد"); setCreating(false); return; }
+    const startPrice = Number(createForm.starting_price);
+    const status = new Date(createForm.starts_at) <= new Date() ? "live" : "upcoming";
+    const { error } = await supabase.from("auctions").insert({
+      seller_id: sellerRow.id,
+      title: createForm.title.trim(),
+      description: createForm.description.trim() || null,
+      starting_price: startPrice,
+      current_price: startPrice,
+      min_increment: createForm.min_increment ? Number(createForm.min_increment) : 0,
+      starts_at: createForm.starts_at,
+      ends_at: createForm.ends_at,
+      status,
+    });
+    setCreating(false);
+    if (error) { setCreateError(error.message); return; }
+    setCreateSuccess(true);
+    setTimeout(() => { setShowCreateModal(false); setCreateSuccess(false); loadAuctions(activeTab); }, 2000);
+  };
 
   const handleBid = async (auctionId) => {
     if (!user) {
@@ -1176,11 +1218,42 @@ const AuctionsScreen = ({ onNavigate, session }) => {
               <div style={{ fontSize: 36, marginBottom: 10 }}>🏷️</div>
               <h4 style={{ margin: "0 0 8px", color: T.textPrimary }}>أنشئ مزادك الخاص</h4>
               <p style={{ margin: "0 0 16px", color: T.textMuted, fontSize: 13 }}>بع سيارتك أو قطعتك عبر المزاد</p>
-              <Btn>إنشاء مزاد جديد</Btn>
+              <Btn onClick={handleOpenCreate}>إنشاء مزاد جديد</Btn>
             </Card>
           )}
         </div>
       )}
+
+      <Modal isOpen={showCreateModal} onClose={() => !creating && setShowCreateModal(false)} title="إنشاء مزاد جديد 🏷️">
+        {createSuccess ? (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+            <p style={{ color: T.green, fontWeight: 700, fontSize: 16 }}>تم إنشاء المزاد بنجاح!</p>
+          </div>
+        ) : (
+          <>
+            <Input label="عنوان المزاد *" value={createForm.title} onChange={v => setCreateForm(f => ({ ...f, title: v }))} placeholder="مثال: تويوتا كامري 2020 للبيع بالمزاد" />
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6 }}>الوصف</label>
+              <textarea value={createForm.description} onChange={e => setCreateForm(f => ({ ...f, description: e.target.value }))} placeholder="تفاصيل إضافية عن المنتج..." rows={3} style={{ width: "100%", background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 12px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box" }} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <Input label="السعر الابتدائي (د.ع) *" value={createForm.starting_price} onChange={v => setCreateForm(f => ({ ...f, starting_price: v }))} placeholder="0" />
+              <Input label="أدنى زيادة (د.ع)" value={createForm.min_increment} onChange={v => setCreateForm(f => ({ ...f, min_increment: v }))} placeholder="0" />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6 }}>تاريخ ووقت البداية *</label>
+              <input type="datetime-local" value={createForm.starts_at} onChange={e => setCreateForm(f => ({ ...f, starts_at: e.target.value }))} style={{ width: "100%", background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 12px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6 }}>تاريخ ووقت النهاية *</label>
+              <input type="datetime-local" value={createForm.ends_at} onChange={e => setCreateForm(f => ({ ...f, ends_at: e.target.value }))} style={{ width: "100%", background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 12px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+            </div>
+            {createError && <p style={{ color: T.red, fontSize: 13, marginBottom: 12, fontWeight: 600 }}>{createError}</p>}
+            <Btn fullWidth onClick={handleCreateAuction} disabled={creating}>{creating ? "جارٍ الإنشاء..." : "إنشاء المزاد"}</Btn>
+          </>
+        )}
+      </Modal>
     </div>
   );
 };
