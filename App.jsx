@@ -1033,7 +1033,8 @@ const AuctionsScreen = ({ onNavigate, session }) => {
 
   const handleCreateAuction = async () => {
     if (!createForm.title.trim()) { setCreateError("اسم المزاد مطلوب"); return; }
-    if (!createForm.starting_price || isNaN(Number(createForm.starting_price))) { setCreateError("السعر الابتدائي مطلوب"); return; }
+    const rawPrice = String(createForm.starting_price).replace(/[^0-9.]/g, "");
+    if (!rawPrice || isNaN(Number(rawPrice)) || Number(rawPrice) <= 0) { setCreateError("السعر الابتدائي مطلوب"); return; }
     if (!createForm.starts_at) { setCreateError("تاريخ البداية مطلوب"); return; }
     if (!createForm.ends_at) { setCreateError("تاريخ النهاية مطلوب"); return; }
     if (new Date(createForm.ends_at) <= new Date(createForm.starts_at)) { setCreateError("تاريخ النهاية يجب أن يكون بعد البداية"); return; }
@@ -1041,7 +1042,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
     setCreateError(null);
     const { data: sellerRow } = await supabase.from("sellers").select("id").eq("owner_id", user.id).maybeSingle();
     if (!sellerRow) { setCreateError("يجب أن يكون لديك حساب بائع لإنشاء مزاد"); setCreating(false); return; }
-    const startPrice = Number(createForm.starting_price);
+    const startPrice = Number(String(createForm.starting_price).replace(/[^0-9.]/g, ""));
     const status = new Date(createForm.starts_at) <= new Date() ? "live" : "upcoming";
     const { error } = await supabase.from("auctions").insert({
       seller_id: sellerRow.id,
@@ -1267,8 +1268,8 @@ const AuctionsScreen = ({ onNavigate, session }) => {
               <textarea value={createForm.description} onChange={e => setCreateForm(f => ({ ...f, description: e.target.value }))} placeholder="تفاصيل إضافية عن المنتج..." rows={3} style={{ width: "100%", background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 12px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box" }} />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <Input label="السعر الابتدائي (د.ع) *" value={createForm.starting_price} onChange={v => setCreateForm(f => ({ ...f, starting_price: v }))} placeholder="0" />
-              <Input label="أدنى زيادة (د.ع)" value={createForm.min_increment} onChange={v => setCreateForm(f => ({ ...f, min_increment: v }))} placeholder="0" />
+              <Input label="السعر الابتدائي (د.ع) *" value={createForm.starting_price} onChange={v => setCreateForm(f => ({ ...f, starting_price: v.replace(/[^0-9]/g, "") }))} placeholder="0" type="number" />
+              <Input label="أدنى زيادة (د.ع)" value={createForm.min_increment} onChange={v => setCreateForm(f => ({ ...f, min_increment: v.replace(/[^0-9]/g, "") }))} placeholder="0" type="number" />
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6 }}>تاريخ ووقت البداية *</label>
