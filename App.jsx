@@ -417,10 +417,32 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount }) => {
   const [showSearch, setShowSearch] = useState(false);
   const [activeAuction, setActiveAuction] = useState(0);
   const [cityFilter, setCityFilter] = useState("الكل");
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
 
   useEffect(() => {
     const timer = setInterval(() => setActiveAuction(p => (p + 1) % MOCK.auctions.length), 5000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      setFeaturedLoading(true);
+      const { data } = await supabase
+        .from("products")
+        .select("*, categories(name)")
+        .order("created_at", { ascending: false })
+        .limit(4);
+      setFeaturedProducts((data || []).map(p => ({
+        ...p,
+        image: Array.isArray(p.images) ? (p.images[0] || "📦") : (p.images || "📦"),
+        category: p.categories?.name || "",
+        oldPrice: p.old_price || null,
+        rating: p.rating || 0,
+        reviews: 0,
+      })));
+      setFeaturedLoading(false);
+    })();
   }, []);
 
   const filteredProducts = (() => {
@@ -553,9 +575,16 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount }) => {
                 <Btn variant="secondary" size="sm" style={{ marginTop: 12 }} onClick={() => onNavigate("request")}>اطلب القطعة</Btn>
               </Card>
             )
+          ) : featuredLoading ? (
+            <div style={{ textAlign: "center", padding: 32, color: T.textMuted, fontSize: 13 }}>جارٍ التحميل...</div>
+          ) : featuredProducts.length === 0 ? (
+            <Card style={{ textAlign: "center", padding: 32 }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>🛍️</div>
+              <p style={{ color: T.textSecondary, margin: 0 }}>لا توجد عروض مميزة حالياً</p>
+            </Card>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {filteredProducts.slice(0, 4).map(p => <ProductCard key={p.id} product={p} onView={onProductView} onCart={onCartAdd} />)}
+              {featuredProducts.map(p => <ProductCard key={p.id} product={p} onView={onProductView} onCart={onCartAdd} />)}
             </div>
           )}
         </Section>
