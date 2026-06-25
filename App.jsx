@@ -2702,41 +2702,74 @@ const CartScreen = ({ session, onNavigate, onCartCountChange, profile }) => {
 };
 
 // ── ACADEMY SCREEN ──────────────────────────────────────
+const REAL_COURSES = [
+  {
+    id: 1,
+    title: "Automobile Engineering",
+    provider: "NPTEL / IIT India",
+    level: "متوسط",
+    url: "https://nptel.ac.in/courses/112104219",
+  },
+  {
+    id: 2,
+    title: "Electric Cars: Technology, Business and Policy",
+    provider: "Coursera / TU Delft",
+    level: "مبتدئ",
+    url: "https://www.coursera.org/learn/electric-cars",
+  },
+  {
+    id: 3,
+    title: "Self-Driving Cars Specialization",
+    provider: "Coursera / University of Toronto",
+    level: "متقدم",
+    url: "https://www.coursera.org/specializations/self-driving-cars",
+  },
+  {
+    id: 4,
+    title: "Internal Combustion Engines",
+    provider: "MIT OpenCourseWare",
+    level: "متقدم",
+    url: "https://ocw.mit.edu/courses/2-61-internal-combustion-engines-spring-2008/",
+  },
+  {
+    id: 5,
+    title: "Car Mechanics and Vehicle Maintenance",
+    provider: "Alison",
+    level: "مبتدئ",
+    url: "https://alison.com/tag/automotive",
+  },
+  {
+    id: 6,
+    title: "How Cars Work — Engineering Explained",
+    provider: "YouTube / Engineering Explained",
+    level: "مبتدئ",
+    url: "https://www.youtube.com/@EngineeringExplained/playlists",
+  },
+];
+
 const AcademyScreen = () => {
-  const levels = { "مبتدئ": T.green, "متوسط": T.orange, "متقدم": T.red };
+  const levelColor = { "مبتدئ": T.green, "متوسط": T.orange, "متقدم": T.red };
   return (
     <div style={{ padding: 16 }}>
       <h2 style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 20, fontWeight: 800 }}>🎓 الأكاديمية التعليمية</h2>
-      <p style={{ margin: "0 0 20px", color: T.textSecondary, fontSize: 13 }}>تعلم من أفضل خبراء السيارات في العراق</p>
-
-      {/* Stats */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-        {[["٢١ دورة", "دورة متاحة"], ["٥,٠٠٠+", "طالب مسجل"], ["خبراء", "معتمدون"]].map(([v, l]) => (
-          <Card key={l} style={{ flex: 1, textAlign: "center" }}>
-            <div style={{ color: T.gold, fontWeight: 900, fontSize: 16 }}>{v}</div>
-            <div style={{ color: T.textMuted, fontSize: 11 }}>{l}</div>
-          </Card>
-        ))}
-      </div>
+      <p style={{ margin: "0 0 6px", color: T.textSecondary, fontSize: 13 }}>دورات خارجية مجانية موثّقة في ميكانيك السيارات والهندسة</p>
+      <p style={{ margin: "0 0 20px", color: T.textMuted, fontSize: 11 }}>المحتوى باللغة الإنجليزية — يفتح في نافذة خارجية</p>
 
       <Section title="الدورات المتاحة">
-        {MOCK.courses.map(course => (
+        {REAL_COURSES.map(course => (
           <Card key={course.id} style={{ marginBottom: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <Badge small color={levels[course.level]}>{course.level}</Badge>
-              <Stars rating={course.rating} size={12} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <Badge small color={levelColor[course.level]}>{course.level}</Badge>
+              <div style={{ display: "flex", gap: 6 }}>
+                <Badge small color={T.green}>مجاني</Badge>
+                <Badge small color={T.blue}>خارجي</Badge>
+              </div>
             </div>
-            <h4 style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 15, fontWeight: 800 }}>{course.title}</h4>
-            <p style={{ margin: "0 0 10px", color: T.textSecondary, fontSize: 12 }}>👨‍🏫 {course.instructor}</p>
-            <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-              <span style={{ color: T.textMuted, fontSize: 12 }}>📹 {course.lessons} درس</span>
-              <span style={{ color: T.textMuted, fontSize: 12 }}>⏱️ {course.duration}</span>
-              <span style={{ color: T.textMuted, fontSize: 12 }}>👥 {course.students.toLocaleString("ar-IQ")}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: T.gold, fontWeight: 900, fontSize: 16 }}>{course.price.toLocaleString("ar-IQ")} د.ع</span>
-              <Btn size="sm">الاشتراك</Btn>
-            </div>
+            <h4 style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 14, fontWeight: 800, lineHeight: 1.4 }}>{course.title}</h4>
+            <p style={{ margin: "0 0 14px", color: T.textSecondary, fontSize: 12 }}>🏫 {course.provider}</p>
+            <a href={course.url} target="_blank" rel="noopener noreferrer" style={{ display: "block", textDecoration: "none" }}>
+              <Btn fullWidth size="sm" icon="🔗">ابدأ الدورة</Btn>
+            </a>
           </Card>
         ))}
       </Section>
