@@ -1291,10 +1291,24 @@ const AuctionsScreen = ({ onNavigate, session }) => {
 const DiagnosisScreen = ({ onCartAdd, session }) => {
   const [step, setStep] = useState(1);
   const [vehicle, setVehicle] = useState("");
+  const [manualMode, setManualMode] = useState(false);
+  const [manualVehicle, setManualVehicle] = useState({ brand: "", model: "", year: "" });
+  const [garageVehicles, setGarageVehicles] = useState([]);
+  const [garageLoading, setGarageLoading] = useState(true);
   const [symptoms, setSymptoms] = useState([]);
   const [description, setDescription] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) { setGarageLoading(false); return; }
+    (async () => {
+      const { data } = await supabase.from("vehicles").select("id,brand,model,year,mileage_km").eq("owner_id", uid).order("created_at", { ascending: false });
+      setGarageVehicles(data || []);
+      setGarageLoading(false);
+    })();
+  }, [session?.user?.id]);
 
   const allSymptoms = [
     "صوت غريب عند الفرملة", "اهتزاز عند القيادة", "دخان من المحرك",
@@ -1304,6 +1318,9 @@ const DiagnosisScreen = ({ onCartAdd, session }) => {
   ];
 
   const toggleSymptom = (s) => setSymptoms(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+
+  const manualReady = manualMode && manualVehicle.brand.trim() && manualVehicle.model.trim();
+  const step1Ready = manualMode ? manualReady : !!vehicle;
 
   const runDiagnosis = async () => {
     setLoading(true);
@@ -1327,7 +1344,7 @@ const DiagnosisScreen = ({ onCartAdd, session }) => {
   return (
     <div style={{ padding: 16 }}>
       <h2 style={{ margin: "0 0 8px", color: T.textPrimary, fontSize: 20, fontWeight: 800 }}>🤖 تشخيص الأعطال الذكي</h2>
-      <p style={{ margin: "0 0 20px", color: T.textSecondary, fontSize: 13 }}>مدعوم بالذكاء الاصطناعي — دقة تشخيص 92%</p>
+      <p style={{ margin: "0 0 20px", color: T.textSecondary, fontSize: 13 }}>مدعوم بالذكاء الاصطناعي</p>
 
       {/* Progress */}
       <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
@@ -1338,21 +1355,56 @@ const DiagnosisScreen = ({ onCartAdd, session }) => {
 
       {step === 1 && (
         <div>
-          <h3 style={{ color: T.textPrimary, fontSize: 16, fontWeight: 700, marginBottom: 16 }}>الخطوة ١: حدد سيارتك</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-            {MOCK.vehicles.map(v => (
-              <button key={v.id} onClick={() => setVehicle(v.id)} style={{
-                background: vehicle === v.id ? `${T.gold}22` : T.navyCard,
-                border: `2px solid ${vehicle === v.id ? T.gold : T.navyBorder}`,
-                borderRadius: 14, padding: 14, cursor: "pointer", textAlign: "right"
-              }}>
-                <div style={{ fontSize: 28, marginBottom: 6 }}>🚗</div>
-                <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{v.make} {v.model}</div>
-                <div style={{ color: T.textSecondary, fontSize: 12 }}>{v.year} | {v.km.toLocaleString("ar-IQ")} كم</div>
-              </button>
-            ))}
+          <h3 style={{ color: T.textPrimary, fontSize: 16, fontWeight: 700, marginBottom: 12 }}>الخطوة ١: حدد سيارتك</h3>
+
+          {/* Toggle: garage vs manual */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            <button onClick={() => setManualMode(false)} style={{
+              flex: 1, background: !manualMode ? `${T.gold}22` : T.navyCard,
+              border: `2px solid ${!manualMode ? T.gold : T.navyBorder}`,
+              borderRadius: 10, padding: "9px 8px", color: !manualMode ? T.gold : T.textSecondary,
+              fontFamily: "inherit", fontWeight: 700, fontSize: 13, cursor: "pointer",
+            }}>🚗 من الكراج</button>
+            <button onClick={() => setManualMode(true)} style={{
+              flex: 1, background: manualMode ? `${T.gold}22` : T.navyCard,
+              border: `2px solid ${manualMode ? T.gold : T.navyBorder}`,
+              borderRadius: 10, padding: "9px 8px", color: manualMode ? T.gold : T.textSecondary,
+              fontFamily: "inherit", fontWeight: 700, fontSize: 13, cursor: "pointer",
+            }}>✏️ إدخال يدوي</button>
           </div>
-          <Btn fullWidth onClick={() => setStep(2)} disabled={!vehicle}>التالي →</Btn>
+
+          {!manualMode ? (
+            garageLoading ? (
+              <div style={{ textAlign: "center", padding: 20, color: T.textMuted, fontSize: 13 }}>جارٍ التحميل...</div>
+            ) : garageVehicles.length === 0 ? (
+              <Card style={{ textAlign: "center", padding: 20, marginBottom: 16 }}>
+                <p style={{ color: T.textMuted, margin: "0 0 8px", fontSize: 13 }}>لا توجد مركبات في الكراج</p>
+                <p style={{ color: T.textMuted, margin: 0, fontSize: 12 }}>أضف مركبتك أولاً أو استخدم الإدخال اليدوي</p>
+              </Card>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+                {garageVehicles.map(v => (
+                  <button key={v.id} onClick={() => setVehicle(v.id)} style={{
+                    background: vehicle === v.id ? `${T.gold}22` : T.navyCard,
+                    border: `2px solid ${vehicle === v.id ? T.gold : T.navyBorder}`,
+                    borderRadius: 14, padding: 14, cursor: "pointer", textAlign: "right"
+                  }}>
+                    <div style={{ fontSize: 28, marginBottom: 6 }}>🚗</div>
+                    <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{v.brand} {v.model}</div>
+                    <div style={{ color: T.textSecondary, fontSize: 12 }}>{v.year || "—"}{v.mileage_km ? ` | ${Number(v.mileage_km).toLocaleString("ar-IQ")} كم` : ""}</div>
+                  </button>
+                ))}
+              </div>
+            )
+          ) : (
+            <div style={{ marginBottom: 16 }}>
+              <Input label="الشركة المصنعة *" value={manualVehicle.brand} onChange={v => setManualVehicle(p => ({ ...p, brand: v }))} placeholder="مثال: Toyota, Kia" icon="🏭" />
+              <Input label="الموديل *" value={manualVehicle.model} onChange={v => setManualVehicle(p => ({ ...p, model: v }))} placeholder="مثال: Camry, Elantra" icon="🚗" />
+              <Input label="سنة الصنع" value={manualVehicle.year} onChange={v => setManualVehicle(p => ({ ...p, year: v }))} placeholder="مثال: 2020" type="number" icon="📅" />
+            </div>
+          )}
+
+          <Btn fullWidth onClick={() => setStep(2)} disabled={!step1Ready}>التالي →</Btn>
         </div>
       )}
 
