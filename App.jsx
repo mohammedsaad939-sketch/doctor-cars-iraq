@@ -1851,7 +1851,7 @@ const SellerDashScreen = ({ session }) => {
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <span style={{ color: T.textSecondary, fontSize: 13 }}>{products.length} منتج</span>
-            <Btn size="sm" icon="+" variant="primary" onClick={() => { setSaveError(null); setSaveSuccess(false); resetForm(); setShowAddModal(true); }}>منتج جديد</Btn>
+            <Btn size="sm" icon="+" variant="primary" onClick={() => { setSaveError(null); setSaveSuccessMsg(""); resetForm(); setShowAddModal(true); }}>منتج جديد</Btn>
           </div>
           {productsLoading ? (
             <div style={{ textAlign: "center", padding: 40, color: T.textSecondary, fontSize: 13 }}>جارٍ التحميل...</div>
