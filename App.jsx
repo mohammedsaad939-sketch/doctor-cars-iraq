@@ -2765,7 +2765,7 @@ export default function DoctorCarsApp() {
 
       {/* SHORTCUT TOOLBAR (floating) */}
       {!showBackHeader && (
-        <div style={{ position: "fixed", bottom: 90, left: "50%", transform: "translateX(-50%)", zIndex: 99, display: "flex", gap: 8, background: `${T.navyCard}CC`, backdropFilter: "blur(10px)", border: `1px solid ${T.navyBorder}`, borderRadius: 20, padding: "6px 10px" }}>
+        <div style={{ position: "fixed", bottom: 90, left: "50%", transform: "translateX(-50%)", zIndex: 101, display: "flex", gap: 8, background: `${T.navyCard}CC`, backdropFilter: "blur(10px)", border: `1px solid ${T.navyBorder}`, borderRadius: 20, padding: "6px 10px" }}>
           {[
             { icon: "🤖", screen: "diagnosis", label: "تشخيص" },
             { icon: "🚨", screen: "emergency", label: "طوارئ" },
