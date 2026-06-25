@@ -412,7 +412,7 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
 };
 
 // ── HOME SCREEN ──────────────────────────────────────
-const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount }) => {
+const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile }) => {
   const [searchText, setSearchText] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [activeAuction, setActiveAuction] = useState(0);
@@ -459,7 +459,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount }) => {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div>
             <p style={{ margin: 0, color: T.textMuted, fontSize: 12 }}>أهلاً بك 👋</p>
-            <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 18, fontWeight: 800 }}>أبو علي الميكانيكي</h2>
+            <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 18, fontWeight: 800 }}>{profile?.full_name || "زائر"}</h2>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <button onClick={() => onNavigate("notifications")} style={{ position: "relative", background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 12, width: 42, height: 42, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, cursor: "pointer" }}>
@@ -483,15 +483,12 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount }) => {
             placeholder="ابحث عن قطعة، سيارة، خدمة..."
             style={{
               width: "100%", background: T.navyCard, border: `2px solid ${searchText ? T.gold : T.navyBorder}`,
-              borderRadius: 14, padding: "13px 46px 13px 120px", color: T.textPrimary,
+              borderRadius: 14, padding: "13px 46px 13px 70px", color: T.textPrimary,
               fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box",
               transition: "border-color 0.2s"
             }}
           />
-          <div style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 4 }}>
-            <button onClick={() => {}} style={{ background: `${T.purple}22`, border: "none", borderRadius: 8, padding: "5px 8px", fontSize: 14, cursor: "pointer" }} title="بحث بالصورة">📷</button>
-            <button onClick={() => {}} style={{ background: `${T.blue}22`, border: "none", borderRadius: 8, padding: "5px 8px", fontSize: 14, cursor: "pointer" }} title="بحث صوتي">🎙️</button>
-          </div>
+          <button onClick={() => setShowSearch(true)} style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", background: `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`, border: "none", borderRadius: 9, padding: "6px 12px", color: T.navy, fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>بحث</button>
         </div>
 
         {/* QUICK FILTERS */}
@@ -3030,7 +3027,7 @@ export default function DoctorCarsApp() {
 
   const renderScreen = () => {
     switch (currentScreen) {
-      case "home": return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} />;
+      case "home": return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} profile={profile} />;
       case "shop": return <ShopScreen onProductView={handleProductView} onCartAdd={handleCartAdd} />;
       case "auctions": return <AuctionsScreen onNavigate={navigate} session={session} />;
       case "garage": return <GarageScreen session={session} />;
@@ -3045,7 +3042,7 @@ export default function DoctorCarsApp() {
       case "sellerDash": return <SellerDashScreen session={session} />;
       case "myOrders": return <MyOrdersScreen session={session} />;
       case "admin": return <AdminScreen />;
-      default: return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} />;
+      default: return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} profile={profile} />;
     }
   };
 
