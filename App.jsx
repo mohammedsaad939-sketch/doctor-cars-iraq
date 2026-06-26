@@ -1185,8 +1185,12 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile }) =
               {added ? "تمت الإضافة!" : "أضف للسلة"}
             </Btn>
           </div>
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
             <Btn fullWidth onClick={handleOpenCheckout} variant="blue" icon="🛍️">اشتري الآن</Btn>
+            <Btn size="sm" variant="secondary" icon="↗️" onClick={() => {
+              const text = encodeURIComponent(`شاهد هذا على دكتور السيارات:\n${product.name} - ${product.price.toLocaleString("ar-IQ")} د.ع\n${window.location.href}`);
+              window.open(`https://wa.me/?text=${text}`);
+            }}>مشاركة</Btn>
           </div>
         </div>
       </div>
