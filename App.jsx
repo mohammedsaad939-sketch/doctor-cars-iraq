@@ -1852,7 +1852,7 @@ const GarageScreen = ({ session }) => {
 };
 
 // ── SELLER DASHBOARD SCREEN ──────────────────────────────────────
-const SellerDashScreen = ({ session }) => {
+const SellerDashScreen = ({ session, profile }) => {
   const [activeTab, setActiveTab] = useState("overview");
   const [sellerId, setSellerId] = useState(null);
   const [products, setProducts] = useState([]);
@@ -1883,7 +1883,7 @@ const SellerDashScreen = ({ session }) => {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data } = await supabase.from("sellers").select("id, store_name, verified, rating").eq("owner_id", user.id).single();
+      const { data } = await supabase.from("sellers").select("id, store_name, verified, rating, seller_type, specialty").eq("owner_id", user.id).single();
       if (data) {
         setSellerId(data.id);
         setSellerInfo(data);
@@ -2128,7 +2128,13 @@ const SellerDashScreen = ({ session }) => {
       </div>
 
       <Tabs
-        tabs={[{ id: "overview", label: "نظرة عامة" }, { id: "orders", label: "الطلبات" }, { id: "products", label: "المنتجات" }, { id: "reports", label: "التقارير" }]}
+        tabs={[
+          { id: "overview", label: "نظرة عامة" },
+          { id: "orders", label: "الطلبات" },
+          { id: "products", label: "المنتجات" },
+          ...(sellerInfo?.seller_type === "wholesale" || profile?.role === "trader" ? [{ id: "warehouse", label: "مستودعي" }] : []),
+          { id: "reports", label: "التقارير" },
+        ]}
         active={activeTab} onChange={setActiveTab}
       />
 
@@ -2232,6 +2238,53 @@ const SellerDashScreen = ({ session }) => {
                   <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{p.name}</p>
                   <p style={{ margin: "0 0 8px", color: T.gold, fontSize: 13, fontWeight: 800 }}>{Number(p.price).toLocaleString("ar-IQ")} د.ع</p>
                   <div style={{ display: "flex", gap: 6 }}>
+                    <Btn size="sm" variant="ghost" fullWidth onClick={() => handleEdit(p)}>تعديل</Btn>
+                    <Btn size="sm" variant="danger" onClick={() => handleDelete(p.id)}>🗑️</Btn>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "warehouse" && (
+        <div>
+          {sellerInfo?.specialty && (
+            <Card style={{ marginBottom: 16, background: `${T.purple}11`, border: `1px solid ${T.purple}33` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 24 }}>📦</span>
+                <div>
+                  <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 2 }}>تخصص المستودع</div>
+                  <div style={{ color: T.purple, fontWeight: 800, fontSize: 15 }}>{sellerInfo.specialty}</div>
+                </div>
+              </div>
+            </Card>
+          )}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <span style={{ color: T.textSecondary, fontSize: 13 }}>{products.length} منتج في المستودع</span>
+            <Btn size="sm" icon="+" variant="primary" onClick={() => { setSaveError(null); setSaveSuccessMsg(""); resetForm(); setShowAddModal(true); }}>أضف للمستودع</Btn>
+          </div>
+          {productsLoading ? (
+            <div style={{ textAlign: "center", padding: 40, color: T.textSecondary, fontSize: 13 }}>جارٍ التحميل...</div>
+          ) : products.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 40 }}>
+              <div style={{ fontSize: 40, marginBottom: 8 }}>🏭</div>
+              <p style={{ color: T.textSecondary, fontSize: 14, margin: 0 }}>المستودع فارغ. أضف بضاعتك الأولى!</p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {products.map(p => (
+                <Card key={p.id}>
+                  <div style={{ fontSize: 36, textAlign: "center", background: T.navyLight, borderRadius: 10, padding: "10px 0", marginBottom: 8, overflow: "hidden" }}>
+                    {isImageUrl(p.images?.[0]) ? (
+                      <img src={p.images[0]} alt={p.name} style={{ width: "100%", height: 60, objectFit: "cover", borderRadius: 8 }} />
+                    ) : (p.images?.[0] || "📦")}
+                  </div>
+                  <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{p.name}</p>
+                  <p style={{ margin: "0 0 8px", color: T.gold, fontSize: 13, fontWeight: 800 }}>{Number(p.price).toLocaleString("ar-IQ")} د.ع</p>
+                  <Badge small color={T.purple}>مستودع</Badge>
+                  <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                     <Btn size="sm" variant="ghost" fullWidth onClick={() => handleEdit(p)}>تعديل</Btn>
                     <Btn size="sm" variant="danger" onClick={() => handleDelete(p.id)}>🗑️</Btn>
                   </div>
