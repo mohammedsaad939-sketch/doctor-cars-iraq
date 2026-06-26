@@ -412,13 +412,23 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
 };
 
 // ── HOME SCREEN ──────────────────────────────────────
-const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile }) => {
+const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, session }) => {
   const [searchText, setSearchText] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [activeAuction, setActiveAuction] = useState(0);
   const [cityFilter, setCityFilter] = useState("الكل");
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
+  const [personalListings, setPersonalListings] = useState([]);
+  const [personalListingsLoading, setPersonalListingsLoading] = useState(true);
+  const [selectedListing, setSelectedListing] = useState(null);
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [publishForm, setPublishForm] = useState({ title: "", description: "", price: "", category: "", city: "", contact_phone: "" });
+  const [publishImageFile, setPublishImageFile] = useState(null);
+  const [publishImagePreview, setPublishImagePreview] = useState(null);
+  const [publishLoading, setPublishLoading] = useState(false);
+  const [publishError, setPublishError] = useState(null);
+  const [publishSuccess, setPublishSuccess] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setActiveAuction(p => (p + 1) % MOCK.auctions.length), 5000);
@@ -444,6 +454,80 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile }
       setFeaturedLoading(false);
     })();
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      setPersonalListingsLoading(true);
+      const { data } = await supabase
+        .from("personal_listings")
+        .select("*")
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(10);
+      setPersonalListings(data || []);
+      setPersonalListingsLoading(false);
+    })();
+  }, []);
+
+  const handlePublishSubmit = async () => {
+    if (!publishForm.title.trim() || !publishForm.price || !publishForm.contact_phone.trim()) {
+      setPublishError("يرجى ملء الحقول المطلوبة: العنوان والسعر ورقم الهاتف");
+      return;
+    }
+    setPublishLoading(true);
+    setPublishError(null);
+    let imageUrl = null;
+    if (publishImageFile) {
+      const canvas = document.createElement("canvas");
+      const img = new Image();
+      await new Promise(resolve => {
+        img.onload = () => {
+          const MAX = 1000;
+          let { width, height } = img;
+          if (width > MAX || height > MAX) {
+            if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+            else { width = Math.round(width * MAX / height); height = MAX; }
+          }
+          canvas.width = width; canvas.height = height;
+          canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+          resolve();
+        };
+        img.src = URL.createObjectURL(publishImageFile);
+      });
+      const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.78));
+      const path = `personal/${session.user.id}/${Date.now()}.jpg`;
+      const { error: upErr } = await supabase.storage.from("product-images").upload(path, blob, { contentType: "image/jpeg" });
+      if (!upErr) {
+        const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(path);
+        imageUrl = urlData.publicUrl;
+      }
+    }
+    const { error: insErr } = await supabase.from("personal_listings").insert({
+      user_id: session.user.id,
+      title: publishForm.title.trim(),
+      description: publishForm.description.trim() || null,
+      price: Number(publishForm.price),
+      category: publishForm.category.trim() || null,
+      city: publishForm.city.trim() || null,
+      contact_phone: publishForm.contact_phone.trim(),
+      images: imageUrl ? [imageUrl] : [],
+      status: "active",
+    });
+    setPublishLoading(false);
+    if (insErr) { setPublishError(insErr.message); return; }
+    setPublishSuccess(true);
+    const { data: refreshed } = await supabase.from("personal_listings").select("*").eq("status", "active").order("created_at", { ascending: false }).limit(10);
+    setPersonalListings(refreshed || []);
+  };
+
+  const openPublish = () => {
+    setPublishForm({ title: "", description: "", price: "", category: "", city: profile?.city || "", contact_phone: profile?.phone || "" });
+    setPublishImageFile(null);
+    setPublishImagePreview(null);
+    setPublishError(null);
+    setPublishSuccess(false);
+    setShowPublishModal(true);
+  };
 
   const filteredProducts = (() => {
     let base = MOCK.products;
@@ -558,6 +642,17 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile }
           </div>
         </div>
 
+        {/* PUBLISH YOUR GOODS BANNER */}
+        {session && (
+          <div style={{ background: `linear-gradient(135deg, ${T.navyCard}, ${T.navyLight})`, border: `1px solid ${T.gold}44`, borderRadius: 16, padding: "14px 16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ color: T.gold, fontWeight: 800, fontSize: 15 }}>🛍️ نشر بضاعتك</div>
+              <div style={{ color: T.textSecondary, fontSize: 12, marginTop: 2 }}>بيع أي شيء مباشرةً للمشترين</div>
+            </div>
+            <Btn size="sm" variant="primary" onClick={openPublish}>نشر الآن</Btn>
+          </div>
+        )}
+
         {/* FEATURED PRODUCTS */}
         <Section title="منتجات مميزة" subtitle="أفضل العروض اليوم" action={{ label: "الكل", onClick: () => onNavigate("shop") }}>
           {searchText ? (
@@ -585,6 +680,33 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile }
             </div>
           )}
         </Section>
+
+        {/* PERSONAL LISTINGS */}
+        {(personalListingsLoading || personalListings.length > 0) && (
+          <Section title="بيع شخصي" subtitle="بضاعة من الأفراد مباشرةً">
+            {personalListingsLoading ? (
+              <div style={{ textAlign: "center", padding: 20, color: T.textMuted, fontSize: 13 }}>جارٍ التحميل...</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {personalListings.map(listing => (
+                  <Card key={listing.id} onClick={() => setSelectedListing(listing)} style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <div style={{ width: 56, height: 56, borderRadius: 12, background: T.navyLight, flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>
+                      {isImageUrl(listing.images?.[0]) ? <img src={listing.images[0]} alt={listing.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🏷️"}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                        <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{listing.title}</span>
+                        <Badge small color={T.orange}>بيع شخصي</Badge>
+                      </div>
+                      <div style={{ color: T.gold, fontWeight: 800, fontSize: 13 }}>{Number(listing.price).toLocaleString("ar-IQ")} د.ع</div>
+                      {listing.city && <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>📍 {listing.city}</div>}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </Section>
+        )}
 
         {/* AI DIAGNOSIS BANNER */}
         <div style={{ background: `linear-gradient(135deg, #1A0D4A, #2D1B69)`, border: `1px solid ${T.purple}44`, borderRadius: 20, padding: 20, marginBottom: 20, position: "relative", overflow: "hidden" }} onClick={() => onNavigate("diagnosis")}>
@@ -633,6 +755,74 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile }
           </div>
         </Section>
       </div>
+
+      {/* PUBLISH LISTING MODAL */}
+      <Modal isOpen={showPublishModal} onClose={() => !publishLoading && setShowPublishModal(false)} title="نشر بضاعتك 🛍️">
+        {publishSuccess ? (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+            <p style={{ color: T.green, fontSize: 15, fontWeight: 700, margin: 0 }}>تم نشر إعلانك بنجاح!</p>
+            <Btn fullWidth variant="secondary" onClick={() => setShowPublishModal(false)} style={{ marginTop: 16 }}>إغلاق</Btn>
+          </div>
+        ) : (
+          <>
+            <Input label="عنوان الإعلان *" value={publishForm.title} onChange={v => setPublishForm(p => ({ ...p, title: v }))} placeholder="مثال: كاميرا خلفية هوندا سيفيك" icon="🏷️" />
+            <Input label="الوصف" value={publishForm.description} onChange={v => setPublishForm(p => ({ ...p, description: v }))} placeholder="وصف اختياري للبضاعة..." icon="📝" />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <Input label="السعر * (د.ع)" type="number" value={publishForm.price} onChange={v => setPublishForm(p => ({ ...p, price: v }))} placeholder="25000" />
+              <Input label="القسم" value={publishForm.category} onChange={v => setPublishForm(p => ({ ...p, category: v }))} placeholder="قطع غيار" icon="🗂️" />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <Input label="المدينة" value={publishForm.city} onChange={v => setPublishForm(p => ({ ...p, city: v }))} placeholder="بغداد" icon="📍" />
+              <Input label="رقم الهاتف *" type="tel" value={publishForm.contact_phone} onChange={v => setPublishForm(p => ({ ...p, contact_phone: v }))} placeholder="07xxxxxxxxx" icon="📱" />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>صورة (اختياري)</label>
+              {publishImagePreview && <div style={{ marginBottom: 8, borderRadius: 10, overflow: "hidden" }}><img src={publishImagePreview} alt="معاينة" style={{ width: "100%", height: 120, objectFit: "cover" }} /></div>}
+              <label style={{ display: "flex", alignItems: "center", gap: 8, background: T.navyLight, border: `1px dashed ${T.navyBorder}`, borderRadius: 10, padding: "10px 14px", cursor: "pointer" }}>
+                <span style={{ fontSize: 18 }}>📷</span>
+                <span style={{ color: T.textSecondary, fontSize: 13 }}>{publishImageFile ? publishImageFile.name : "اختر صورة..."}</span>
+                <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (!f) return; setPublishImageFile(f); setPublishImagePreview(URL.createObjectURL(f)); }} />
+              </label>
+            </div>
+            {publishError && <div style={{ background: `${T.red}22`, border: `1px solid ${T.red}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 12, color: T.red, fontSize: 13 }}>⚠️ {publishError}</div>}
+            <Btn fullWidth variant="primary" onClick={handlePublishSubmit} disabled={publishLoading}>
+              {publishLoading ? "جارٍ النشر..." : "نشر الإعلان"}
+            </Btn>
+          </>
+        )}
+      </Modal>
+
+      {/* PERSONAL LISTING DETAIL MODAL */}
+      <Modal isOpen={!!selectedListing} onClose={() => setSelectedListing(null)} title="تفاصيل الإعلان">
+        {selectedListing && (
+          <>
+            {isImageUrl(selectedListing.images?.[0]) && (
+              <div style={{ borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
+                <img src={selectedListing.images[0]} alt={selectedListing.title} style={{ width: "100%", height: 180, objectFit: "cover" }} />
+              </div>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <h3 style={{ margin: 0, color: T.textPrimary, fontSize: 17, fontWeight: 800, flex: 1 }}>{selectedListing.title}</h3>
+              <Badge color={T.orange}>بيع شخصي</Badge>
+            </div>
+            <div style={{ color: T.gold, fontWeight: 900, fontSize: 22, marginBottom: 12 }}>{Number(selectedListing.price).toLocaleString("ar-IQ")} د.ع</div>
+            {selectedListing.description && <p style={{ color: T.textSecondary, fontSize: 14, lineHeight: 1.6, margin: "0 0 14px" }}>{selectedListing.description}</p>}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+              {selectedListing.category && <Badge color={T.blue}>🗂️ {selectedListing.category}</Badge>}
+              {selectedListing.city && <Badge color={T.textSecondary}>📍 {selectedListing.city}</Badge>}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Btn fullWidth variant="primary" icon="📱" onClick={() => window.open(`tel:${selectedListing.contact_phone}`)}>اتصال</Btn>
+              <Btn fullWidth variant="ghost" icon="💬" onClick={() => window.open(`https://wa.me/964${selectedListing.contact_phone.replace(/^0/, "")}`)}>واتساب</Btn>
+              <Btn size="sm" variant="secondary" icon="↗️" onClick={() => {
+                const text = encodeURIComponent(`شاهد هذا على دكتور السيارات:\n${selectedListing.title} - ${Number(selectedListing.price).toLocaleString("ar-IQ")} د.ع\n${window.location.href}`);
+                window.open(`https://wa.me/?text=${text}`);
+              }}>مشاركة</Btn>
+            </div>
+          </>
+        )}
+      </Modal>
     </div>
   );
 };
