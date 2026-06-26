@@ -1014,6 +1014,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
   const [bidAmount, setBidAmount] = useState({});
   const [bidState, setBidState] = useState({}); // { [auctionId]: { loading, success, error } }
   const [lastBidsMap, setLastBidsMap] = useState({}); // { [auctionId]: { bidder_id } }
+  const [winnerBidsMap, setWinnerBidsMap] = useState({}); // { [auctionId]: winningAmount }
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({ title: "", description: "", starting_price: "", min_increment: "", starts_at: "", ends_at: "" });
   const [creating, setCreating] = useState(false);
@@ -1107,6 +1108,22 @@ const AuctionsScreen = ({ onNavigate, session }) => {
     return () => { supabase.removeChannel(channel); };
   }, [activeTab]);
 
+  const loadWinnerBids = async (auctionsList) => {
+    const endedWithWinner = (auctionsList || []).filter(a => a.status === "ended" && a.winner_id);
+    if (!endedWithWinner.length) return;
+    const ids = endedWithWinner.map(a => a.id);
+    const { data: bids } = await supabase.from("bids").select("auction_id, bidder_id, amount")
+      .in("auction_id", ids).order("amount", { ascending: false });
+    const map = {};
+    (bids || []).forEach(b => {
+      const auction = endedWithWinner.find(a => a.id === b.auction_id);
+      if (auction && b.bidder_id === auction.winner_id && !map[b.auction_id]) {
+        map[b.auction_id] = b.amount;
+      }
+    });
+    setWinnerBidsMap(map);
+  };
+
   const loadAuctions = async (tab) => {
     setLoading(true);
     setAuctions([]);
@@ -1125,6 +1142,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
       const map = {};
       (latestBids || []).forEach(b => { if (!map[b.auction_id]) map[b.auction_id] = b; });
       setLastBidsMap(map);
+      await loadWinnerBids(data || []);
       setLoading(false);
       return;
     }
@@ -1135,6 +1153,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
     else if (tab === "ended")    q = q.eq("status", "ended").order("ends_at", { ascending: false });
     const { data } = await q;
     setAuctions(data || []);
+    await loadWinnerBids(data || []);
     setLoading(false);
   };
 
@@ -1228,6 +1247,31 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                       </div>
                       {bid.error && <p style={{ margin: "4px 0 0", color: T.red, fontSize: 12, fontWeight: 600 }}>{bid.error}</p>}
                       {bid.success && <p style={{ margin: "4px 0 0", color: T.green, fontSize: 12, fontWeight: 700 }}>✓ تمت المزايدة بنجاح!</p>}
+                    </div>
+                  );
+                })()}
+                {auction.status === "ended" && (() => {
+                  if (!auction.winner_id) {
+                    return (
+                      <div style={{ background: `${T.navyLight}`, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
+                        <p style={{ margin: 0, color: T.textMuted, fontSize: 13, fontWeight: 600 }}>🔒 انتهى المزاد بدون أي مزايدات</p>
+                      </div>
+                    );
+                  }
+                  const winAmount = winnerBidsMap[auction.id];
+                  const isWinner = user && user.id === auction.winner_id;
+                  if (isWinner) {
+                    return (
+                      <div style={{ background: `${T.green}22`, border: `1px solid ${T.green}55`, borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
+                        <p style={{ margin: "0 0 4px", color: T.green, fontSize: 15, fontWeight: 800 }}>🎉 لقد فزت بهذا المزاد!</p>
+                        {winAmount != null && <p style={{ margin: 0, color: T.green, fontSize: 13, fontWeight: 700 }}>السعر النهائي: {winAmount.toLocaleString("ar-IQ")} د.ع</p>}
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ background: `${T.navyLight}`, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
+                      <p style={{ margin: "0 0 4px", color: T.textMuted, fontSize: 13, fontWeight: 600 }}>🔒 انتهى المزاد</p>
+                      {winAmount != null && <p style={{ margin: 0, color: T.gold, fontSize: 13, fontWeight: 700 }}>السعر النهائي: {winAmount.toLocaleString("ar-IQ")} د.ع</p>}
                     </div>
                   );
                 })()}
