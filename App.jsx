@@ -2708,7 +2708,7 @@ const REAL_COURSES = [
     title: "Automobile Engineering",
     provider: "NPTEL / IIT India",
     level: "متوسط",
-    url: "https://nptel.ac.in/courses/112104219",
+    url: "https://nptel.ac.in/courses/107106088",
     summary: {
       ar: "دورة هندسية من معهد IIT الهندي تشرح الأنظمة الأساسية للسيارة: المحرك، نقل الحركة، التعليق، والفرامل، مع الأساس الرياضي لكل نظام. مناسبة لمن يريد فهماً تقنياً عميقاً.",
       en: "An engineering course from IIT (India) covering the core systems of a car — engine, transmission, suspension, and brakes — with the mathematical foundation behind each. Suited for those wanting a deep technical understanding.",
