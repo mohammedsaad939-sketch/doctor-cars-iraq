@@ -2720,7 +2720,7 @@ const REAL_COURSES = [
     title: "Electric Cars: Technology, Business and Policy",
     provider: "Coursera / TU Delft",
     level: "مبتدئ",
-    url: "https://www.coursera.org/learn/electric-cars",
+    url: "https://online-learning.tudelft.nl/programs/electric-cars/",
     summary: {
       ar: "دورة من جامعة دلفت الهولندية تشرح كيف تعمل السيارة الكهربائية: المحرك الكهربائي، البطارية، الشحن، ومستقبل التنقل الكهربائي.",
       en: "A course from TU Delft (Netherlands) explaining how electric cars work — the electric motor, battery, charging, and the future of electric mobility.",
