@@ -2077,7 +2077,8 @@ const SellerDashScreen = ({ session, profile }) => {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data } = await supabase.from("sellers").select("id, store_name, verified, rating, seller_type, specialty").eq("owner_id", user.id).single();
+      const { data: rows } = await supabase.from("sellers").select("id, store_name, verified, rating, seller_type, specialty").eq("owner_id", user.id);
+      const data = rows?.[0] || null;
       if (data) {
         setSellerId(data.id);
         setSellerInfo(data);
