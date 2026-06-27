@@ -3319,10 +3319,14 @@ const RoleSelectionScreen = ({ session, onComplete }) => {
     const { error: pErr } = await supabase.from("profiles").update({ role }).eq("id", user.id);
     if (pErr) { setError(pErr.message); setSaving(false); return; }
     if (sellerPayload) {
-      const { error: sErr } = await supabase.from("sellers").insert({ owner_id: user.id, ...sellerPayload });
-      if (sErr && sErr.code !== "23505" && !sErr.message?.includes("duplicate")) {
-        setError(sErr.message); setSaving(false); return;
+      const { data: existing } = await supabase.from("sellers").select("id").eq("owner_id", user.id).maybeSingle();
+      let sErr;
+      if (existing) {
+        ({ error: sErr } = await supabase.from("sellers").update(sellerPayload).eq("id", existing.id));
+      } else {
+        ({ error: sErr } = await supabase.from("sellers").insert({ owner_id: user.id, ...sellerPayload }));
       }
+      if (sErr) { setError(sErr.message); setSaving(false); return; }
     }
     sessionStorage.setItem("role_selected", "1");
     setSaving(false);
