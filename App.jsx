@@ -423,7 +423,8 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
   const [personalListingsLoading, setPersonalListingsLoading] = useState(true);
   const [selectedListing, setSelectedListing] = useState(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
-  const [publishForm, setPublishForm] = useState({ title: "", description: "", price: "", category: "", city: "", contact_phone: "" });
+  const [publishForm, setPublishForm] = useState({ title: "", description: "", price: "", category_id: "", city: "", contact_phone: "" });
+  const [publishCategories, setPublishCategories] = useState([]);
   const [publishImageFile, setPublishImageFile] = useState(null);
   const [publishImagePreview, setPublishImagePreview] = useState(null);
   const [publishLoading, setPublishLoading] = useState(false);
@@ -469,6 +470,12 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
     })();
   }, []);
 
+  useEffect(() => {
+    supabase.from("categories").select("id,name").order("sort_order").then(({ data }) => {
+      if (data) setPublishCategories(data);
+    });
+  }, []);
+
   const handlePublishSubmit = async () => {
     if (!publishForm.title.trim() || !publishForm.price || !publishForm.contact_phone.trim()) {
       setPublishError("يرجى ملء الحقول المطلوبة: العنوان والسعر ورقم الهاتف");
@@ -507,7 +514,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
       title: publishForm.title.trim(),
       description: publishForm.description.trim() || null,
       price: Number(publishForm.price),
-      category: publishForm.category.trim() || null,
+      category_id: publishForm.category_id ? Number(publishForm.category_id) : null,
       city: publishForm.city.trim() || null,
       contact_phone: publishForm.contact_phone.trim(),
       images: imageUrl ? [imageUrl] : [],
@@ -521,7 +528,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
   };
 
   const openPublish = () => {
-    setPublishForm({ title: "", description: "", price: "", category: "", city: profile?.city || "", contact_phone: profile?.phone || "" });
+    setPublishForm({ title: "", description: "", price: "", category_id: "", city: profile?.city || "", contact_phone: profile?.phone || "" });
     setPublishImageFile(null);
     setPublishImagePreview(null);
     setPublishError(null);
@@ -770,7 +777,13 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
             <Input label="الوصف" value={publishForm.description} onChange={v => setPublishForm(p => ({ ...p, description: v }))} placeholder="وصف اختياري للبضاعة..." icon="📝" />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <Input label="السعر * (د.ع)" type="number" value={publishForm.price} onChange={v => setPublishForm(p => ({ ...p, price: v }))} placeholder="25000" />
-              <Input label="القسم" value={publishForm.category} onChange={v => setPublishForm(p => ({ ...p, category: v }))} placeholder="قطع غيار" icon="🗂️" />
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>القسم</label>
+                <select value={publishForm.category_id} onChange={e => setPublishForm(p => ({ ...p, category_id: e.target.value }))} style={{ width: "100%", background: T.navyLight, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "11px 14px", color: T.textPrimary, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", appearance: "none", cursor: "pointer" }}>
+                  <option value="">بدون فئة</option>
+                  {publishCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <Input label="المدينة" value={publishForm.city} onChange={v => setPublishForm(p => ({ ...p, city: v }))} placeholder="بغداد" icon="📍" />
