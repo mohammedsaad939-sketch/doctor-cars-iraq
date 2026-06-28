@@ -2425,9 +2425,9 @@ const SellerDashScreen = ({ session, profile }) => {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {products.map(p => (
                 <Card key={p.id}>
-                  <div style={{ fontSize: 36, textAlign: "center", background: T.navyLight, borderRadius: 10, padding: "10px 0", marginBottom: 8, overflow: "hidden" }}>
+                  <div style={{ fontSize: 36, textAlign: "center", background: T.navyLight, borderRadius: 10, marginBottom: 8, overflow: "hidden", height: 150, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {isImageUrl(p.images?.[0]) ? (
-                      <img src={p.images[0]} alt={p.name} style={{ width: "100%", height: 60, objectFit: "cover", borderRadius: 8 }} />
+                      <img src={p.images[0]} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} />
                     ) : (p.images?.[0] || "📦")}
                   </div>
                   <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{p.name}</p>
@@ -2471,9 +2471,9 @@ const SellerDashScreen = ({ session, profile }) => {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {products.map(p => (
                 <Card key={p.id}>
-                  <div style={{ fontSize: 36, textAlign: "center", background: T.navyLight, borderRadius: 10, padding: "10px 0", marginBottom: 8, overflow: "hidden" }}>
+                  <div style={{ fontSize: 36, textAlign: "center", background: T.navyLight, borderRadius: 10, marginBottom: 8, overflow: "hidden", height: 150, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {isImageUrl(p.images?.[0]) ? (
-                      <img src={p.images[0]} alt={p.name} style={{ width: "100%", height: 60, objectFit: "cover", borderRadius: 8 }} />
+                      <img src={p.images[0]} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} />
                     ) : (p.images?.[0] || "📦")}
                   </div>
                   <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{p.name}</p>
