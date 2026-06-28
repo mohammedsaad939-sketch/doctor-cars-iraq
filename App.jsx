@@ -233,7 +233,7 @@ const ProductCard = ({ product, onView, onCart }) => (
         -{Math.round((1 - product.price / product.oldPrice) * 100)}%
       </div>
     )}
-    <div style={{ fontSize: 48, textAlign: "center", marginBottom: 10, background: `${T.navyLight}`, borderRadius: 12, overflow: "hidden", height: 90, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ fontSize: 48, textAlign: "center", marginBottom: 10, background: `${T.navyLight}`, borderRadius: 12, overflow: "hidden", height: 170, display: "flex", alignItems: "center", justifyContent: "center" }}>
       {isImageUrl(product.image) ? <img src={product.image} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : product.image}
     </div>
     <div style={{ marginBottom: 6 }}>
