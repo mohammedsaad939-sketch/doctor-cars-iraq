@@ -1293,46 +1293,88 @@ const AuctionsScreen = ({ onNavigate, session }) => {
   const [lastBidsMap, setLastBidsMap] = useState({}); // { [auctionId]: { bidder_id } }
   const [winnerBidsMap, setWinnerBidsMap] = useState({}); // { [auctionId]: winningAmount }
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createForm, setCreateForm] = useState({ title: "", description: "", starting_price: "", min_increment: "", starts_at: "", ends_at: "" });
+  const [createForm, setCreateForm] = useState({ title: "", description: "", starting_price: "", min_increment: "", starts_at: "", ends_at: "", category_id: "", vehicle_id: "" });
+  const [auctionCategories, setAuctionCategories] = useState([]);
+  const [sellerVehicles, setSellerVehicles] = useState([]);
+  const [auctionImageFiles, setAuctionImageFiles] = useState([]);
+  const [auctionImagePreviews, setAuctionImagePreviews] = useState([]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
   const [createSuccess, setCreateSuccess] = useState(false);
 
-  const handleOpenCreate = () => {
+  const handleOpenCreate = async () => {
     if (!user) { setCreateError("يجب تسجيل الدخول أولاً"); setShowCreateModal(true); return; }
-    setCreateForm({ title: "", description: "", starting_price: "", min_increment: "", starts_at: "", ends_at: "" });
+    setCreateForm({ title: "", description: "", starting_price: "", min_increment: "", starts_at: "", ends_at: "", category_id: "", vehicle_id: "" });
     setCreateError(null);
     setCreateSuccess(false);
+    setAuctionImageFiles([]);
+    auctionImagePreviews.forEach(u => URL.revokeObjectURL(u));
+    setAuctionImagePreviews([]);
     setShowCreateModal(true);
+    const [{ data: cats }, { data: veh }] = await Promise.all([
+      supabase.from("categories").select("id,name").order("sort_order"),
+      supabase.from("vehicles").select("*").eq("owner_id", user.id).order("created_at", { ascending: false }),
+    ]);
+    setAuctionCategories(cats || []);
+    setSellerVehicles(veh || []);
   };
 
   const handleCreateAuction = async () => {
     if (!createForm.title.trim()) { setCreateError("اسم المزاد مطلوب"); return; }
+    if (!createForm.category_id) { setCreateError("الفئة مطلوبة"); return; }
     const rawPrice = String(createForm.starting_price).replace(/[^0-9.]/g, "");
     if (!rawPrice || isNaN(Number(rawPrice)) || Number(rawPrice) <= 0) { setCreateError("السعر الابتدائي مطلوب"); return; }
     if (!createForm.starts_at) { setCreateError("تاريخ البداية مطلوب"); return; }
     if (!createForm.ends_at) { setCreateError("تاريخ النهاية مطلوب"); return; }
     if (new Date(createForm.ends_at) <= new Date(createForm.starts_at)) { setCreateError("تاريخ النهاية يجب أن يكون بعد البداية"); return; }
+    const isCars = String(createForm.category_id) === "8";
+    if (isCars && !createForm.vehicle_id) { setCreateError("يجب اختيار مركبة لمزادات السيارات"); return; }
     setCreating(true);
     setCreateError(null);
     const { data: sellerRow } = await supabase.from("sellers").select("id").eq("owner_id", user.id).maybeSingle();
     if (!sellerRow) { setCreateError("يجب أن يكون لديك حساب بائع لإنشاء مزاد"); setCreating(false); return; }
     const startPrice = Number(String(createForm.starting_price).replace(/[^0-9.]/g, ""));
     const status = new Date(createForm.starts_at) <= new Date() ? "live" : "upcoming";
+    let images = [];
+    if (isCars) {
+      const v = sellerVehicles.find(v => v.id === createForm.vehicle_id);
+      images = v?.images || [];
+    } else if (auctionImageFiles.length > 0) {
+      for (let i = 0; i < auctionImageFiles.length; i++) {
+        const file = auctionImageFiles[i];
+        const path = `auctions/${Date.now()}_${i}_${file.name}`;
+        const { error: upErr } = await supabase.storage.from("product-images").upload(path, file, { upsert: false });
+        if (upErr) { setCreateError(`فشل رفع الصورة: ${upErr.message}`); setCreating(false); return; }
+        const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(path);
+        images.push(urlData.publicUrl);
+      }
+    }
     const { error } = await supabase.from("auctions").insert({
       seller_id: sellerRow.id,
       title: createForm.title.trim(),
-      description: createForm.description.trim() || null,
+      description: isCars ? null : (createForm.description.trim() || null),
       starting_price: startPrice,
       current_price: startPrice,
       min_increment: createForm.min_increment ? Number(createForm.min_increment) : 0,
       starts_at: createForm.starts_at,
       ends_at: createForm.ends_at,
       status,
+      category_id: Number(createForm.category_id),
+      images,
+      vehicle_id: isCars ? createForm.vehicle_id : null,
     });
     setCreating(false);
-    if (error) { setCreateError(error.message); return; }
+    if (error) {
+      const msg = (error.message.includes("vehicle_id") || error.message.includes("trigger"))
+        ? "مزادات السيارات تتطلب ربط مركبة. الرجاء اختيار مركبة صحيحة."
+        : error.message;
+      setCreateError(msg);
+      return;
+    }
     setCreateSuccess(true);
+    auctionImagePreviews.forEach(u => URL.revokeObjectURL(u));
+    setAuctionImagePreviews([]);
+    setAuctionImageFiles([]);
     setTimeout(() => { setShowCreateModal(false); setCreateSuccess(false); loadAuctions(activeTab); }, 2000);
   };
 
@@ -1410,7 +1452,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
       const { data: myBids } = await supabase.from("bids").select("auction_id").eq("bidder_id", user.id);
       const ids = [...new Set((myBids || []).map(b => b.auction_id))];
       if (!ids.length) { setLoading(false); return; }
-      const { data } = await supabase.from("auctions").select("*, sellers(store_name)").in("id", ids);
+      const { data } = await supabase.from("auctions").select("*, sellers(store_name), vehicles(*)").in("id", ids);
       setAuctions(data || []);
       // جلب آخر مزايدة لكل مزاد لمعرفة من هو الأعلى حالياً
       const { data: latestBids } = await supabase
@@ -1424,7 +1466,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
       return;
     }
 
-    let q = supabase.from("auctions").select("*, sellers(store_name)");
+    let q = supabase.from("auctions").select("*, sellers(store_name), vehicles(*)");
     if (tab === "live")       q = q.eq("status", "live").order("ends_at");
     else if (tab === "upcoming") q = q.eq("status", "upcoming").order("starts_at");
     else if (tab === "ended")    q = q.eq("status", "ended").order("ends_at", { ascending: false });
@@ -1468,7 +1510,9 @@ const AuctionsScreen = ({ onNavigate, session }) => {
           )}
 
           {auctions.map(auction => {
-            const imgIsUrl = isImageUrl(auction.image);
+            const hasVehicle = !!auction.vehicle_id && auction.vehicles;
+            const displayImages = hasVehicle ? (auction.vehicles.images || []) : (auction.images || []);
+            const firstImg = isImageUrl(displayImages[0]) ? displayImages[0] : null;
             const minRequired = (auction.current_price || auction.starting_price || 0) + (auction.min_increment || 0);
             const lastBid = lastBidsMap[auction.id];
             const isTopBidder = activeTab === "mine" && user && lastBid?.bidder_id === user.id;
@@ -1485,9 +1529,38 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                     <span style={{ color: T.gold, fontWeight: 700, fontSize: 12 }}>يبدأ: {new Date(auction.starts_at).toLocaleDateString("ar-IQ")}</span>
                   )}
                 </div>
-                <div style={{ fontSize: imgIsUrl ? undefined : 48, textAlign: "center", background: T.navyLight, borderRadius: 12, padding: imgIsUrl ? 0 : "16px 0", marginBottom: 12, overflow: "hidden" }}>
-                  {imgIsUrl ? <img src={auction.image} alt={auction.title} style={{ width: "100%", height: 160, objectFit: "cover", borderRadius: 12 }} /> : (auction.image || "🏆")}
+                <div style={{ fontSize: firstImg ? undefined : 48, textAlign: "center", background: T.navyLight, borderRadius: 12, padding: firstImg ? 0 : "16px 0", marginBottom: 12, overflow: "hidden" }}>
+                  {firstImg ? <img src={firstImg} alt={auction.title} style={{ width: "100%", height: 160, objectFit: "cover", borderRadius: 12 }} /> : "🏆"}
                 </div>
+                {hasVehicle && (
+                  <div style={{ background: T.navyMid, borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+                    <div style={{ color: T.gold, fontWeight: 800, fontSize: 12, marginBottom: 6 }}>🚗 تفاصيل المركبة</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                      {auction.vehicles.brand && auction.vehicles.model && (
+                        <div><div style={{ color: T.textMuted, fontSize: 10, marginBottom: 2 }}>الموديل</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{auction.vehicles.brand} {auction.vehicles.model}</div></div>
+                      )}
+                      {auction.vehicles.year && (
+                        <div><div style={{ color: T.textMuted, fontSize: 10, marginBottom: 2 }}>سنة الصنع</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{auction.vehicles.year}</div></div>
+                      )}
+                      {auction.vehicles.chassis_number && (
+                        <div><div style={{ color: T.textMuted, fontSize: 10, marginBottom: 2 }}>رقم الشاصي</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 11 }}>{auction.vehicles.chassis_number}</div></div>
+                      )}
+                      {auction.vehicles.import_origin && (
+                        <div><div style={{ color: T.textMuted, fontSize: 10, marginBottom: 2 }}>أصل الاستيراد</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{auction.vehicles.import_origin === "american" ? "وارد أمريكي" : "وارد خليجي"}</div></div>
+                      )}
+                      {auction.vehicles.mileage_km != null && (
+                        <div><div style={{ color: T.textMuted, fontSize: 10, marginBottom: 2 }}>المسافة المقطوعة</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{Number(auction.vehicles.mileage_km).toLocaleString("ar-IQ")} كم</div></div>
+                      )}
+                    </div>
+                    {displayImages.length > 1 && (
+                      <div style={{ display: "flex", gap: 6, marginTop: 8, overflowX: "auto" }}>
+                        {displayImages.slice(1).map((url, i) => (
+                          <img key={i} src={url} alt="" style={{ width: 52, height: 52, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <h3 style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 15, fontWeight: 800 }}>{auction.title}</h3>
                 {auction.description && <p style={{ margin: "0 0 8px", color: T.textMuted, fontSize: 12 }}>{auction.description}</p>}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -1572,7 +1645,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
         </div>
       )}
 
-      <Modal isOpen={showCreateModal} onClose={() => !creating && setShowCreateModal(false)} title="إنشاء مزاد جديد 🏷️">
+      <Modal isOpen={showCreateModal} onClose={() => { if (!creating) { auctionImagePreviews.forEach(u => URL.revokeObjectURL(u)); setAuctionImagePreviews([]); setAuctionImageFiles([]); setShowCreateModal(false); } }} title="إنشاء مزاد جديد 🏷️">
         {createSuccess ? (
           <div style={{ textAlign: "center", padding: "20px 0" }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
@@ -1582,9 +1655,55 @@ const AuctionsScreen = ({ onNavigate, session }) => {
           <>
             <Input label="عنوان المزاد *" value={createForm.title} onChange={v => setCreateForm(f => ({ ...f, title: v }))} placeholder="مثال: تويوتا كامري 2020 للبيع بالمزاد" />
             <div style={{ marginBottom: 14 }}>
-              <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6 }}>الوصف</label>
-              <textarea value={createForm.description} onChange={e => setCreateForm(f => ({ ...f, description: e.target.value }))} placeholder="تفاصيل إضافية عن المنتج..." rows={3} style={{ width: "100%", background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 12px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box" }} />
+              <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>الفئة *</label>
+              <select value={createForm.category_id} onChange={e => setCreateForm(f => ({ ...f, category_id: e.target.value, vehicle_id: "" }))} style={{ width: "100%", background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 12px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, outline: "none", boxSizing: "border-box", appearance: "none" }}>
+                <option value="">-- اختر الفئة --</option>
+                {auctionCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
             </div>
+            {String(createForm.category_id) === "8" ? (
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>المركبة *</label>
+                {sellerVehicles.length === 0 ? (
+                  <div style={{ background: `${T.gold}11`, border: `1px solid ${T.gold}44`, borderRadius: 10, padding: "14px 16px", textAlign: "center" }}>
+                    <p style={{ margin: "0 0 10px", color: T.textSecondary, fontSize: 13 }}>لا توجد مركبات مسجلة. أضف مركبتك أولاً من شاشة مركبتي.</p>
+                    <Btn size="sm" variant="secondary" onClick={() => { setShowCreateModal(false); if (typeof onNavigate === "function") onNavigate("garage"); }}>انتقل إلى مركبتي</Btn>
+                  </div>
+                ) : (
+                  <select value={createForm.vehicle_id} onChange={e => setCreateForm(f => ({ ...f, vehicle_id: e.target.value }))} style={{ width: "100%", background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 12px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, outline: "none", boxSizing: "border-box", appearance: "none" }}>
+                    <option value="">-- اختر المركبة --</option>
+                    {sellerVehicles.map(v => <option key={v.id} value={v.id}>{v.brand} {v.model}{v.year ? ` (${v.year})` : ""}{v.plate_number ? ` — ${v.plate_number}` : ""}</option>)}
+                  </select>
+                )}
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6 }}>الوصف</label>
+                  <textarea value={createForm.description} onChange={e => setCreateForm(f => ({ ...f, description: e.target.value }))} placeholder="تفاصيل إضافية عن المنتج..." rows={3} style={{ width: "100%", background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 12px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6 }}>صور المزاد</label>
+                  <input type="file" accept="image/*" multiple onChange={e => {
+                    const files = Array.from(e.target.files);
+                    setAuctionImageFiles(prev => [...prev, ...files]);
+                    files.forEach(file => setAuctionImagePreviews(prev => [...prev, URL.createObjectURL(file)]));
+                    e.target.value = "";
+                  }} style={{ display: "none" }} id="auction-img-input" />
+                  <label htmlFor="auction-img-input" style={{ display: "inline-block", background: T.navyLight, border: `1px dashed ${T.navyBorder}`, borderRadius: 10, padding: "10px 18px", color: T.textSecondary, fontSize: 13, cursor: "pointer" }}>+ إضافة صور</label>
+                  {auctionImagePreviews.length > 0 && (
+                    <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                      {auctionImagePreviews.map((url, i) => (
+                        <div key={i} style={{ position: "relative" }}>
+                          <img src={url} alt="" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover" }} />
+                          <button onClick={() => { URL.revokeObjectURL(url); setAuctionImagePreviews(p => p.filter((_, j) => j !== i)); setAuctionImageFiles(p => p.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: -6, right: -6, background: T.red, color: "#fff", border: "none", borderRadius: "50%", width: 18, height: 18, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <Input label="السعر الابتدائي (د.ع) *" value={createForm.starting_price} onChange={v => setCreateForm(f => ({ ...f, starting_price: v.replace(/[^0-9]/g, "") }))} placeholder="0" type="number" />
               <Input label="أدنى زيادة (د.ع)" value={createForm.min_increment} onChange={v => setCreateForm(f => ({ ...f, min_increment: v.replace(/[^0-9]/g, "") }))} placeholder="0" type="number" />
@@ -1598,7 +1717,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
               <input type="datetime-local" value={createForm.ends_at} onChange={e => setCreateForm(f => ({ ...f, ends_at: e.target.value }))} style={{ width: "100%", background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 12px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
             </div>
             {createError && <p style={{ color: T.red, fontSize: 13, marginBottom: 12, fontWeight: 600 }}>{createError}</p>}
-            <Btn fullWidth onClick={handleCreateAuction} disabled={creating}>{creating ? "جارٍ الإنشاء..." : "إنشاء المزاد"}</Btn>
+            <Btn fullWidth onClick={handleCreateAuction} disabled={creating || (String(createForm.category_id) === "8" && sellerVehicles.length === 0)}>{creating ? "جارٍ الإنشاء..." : "إنشاء المزاد"}</Btn>
           </>
         )}
       </Modal>
