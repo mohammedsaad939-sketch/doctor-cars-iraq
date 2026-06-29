@@ -2328,6 +2328,14 @@ const SellerDashScreen = ({ session, profile }) => {
   const [sellerAuctionsLoading, setSellerAuctionsLoading] = useState(false);
   const [deleteAuctionSuccess, setDeleteAuctionSuccess] = useState("");
   const [deleteAuctionError, setDeleteAuctionError] = useState("");
+  const [editingAuction, setEditingAuction] = useState(null);
+  const [editAuctionForm, setEditAuctionForm] = useState({ title: "", description: "", starting_price: "", min_increment: "", ends_at: "", category_id: "", vehicle_id: "" });
+  const [editAuctionCategories, setEditAuctionCategories] = useState([]);
+  const [editAuctionVehicles, setEditAuctionVehicles] = useState([]);
+  const [editAuctionNewFiles, setEditAuctionNewFiles] = useState([]);
+  const [editAuctionNewPreviews, setEditAuctionNewPreviews] = useState([]);
+  const [editAuctionSaving, setEditAuctionSaving] = useState(false);
+  const [editAuctionError, setEditAuctionError] = useState(null);
 
   const user = session?.user;
 
@@ -2400,6 +2408,67 @@ const SellerDashScreen = ({ session, profile }) => {
     setSellerAuctions(prev => prev.filter(a => a.id !== auctionId));
     setDeleteAuctionSuccess("تم حذف المزاد بنجاح");
     setTimeout(() => setDeleteAuctionSuccess(""), 3000);
+  };
+
+  const handleOpenEditAuction = async (auction) => {
+    setEditingAuction(auction);
+    setEditAuctionForm({
+      title: auction.title || "",
+      description: auction.description || "",
+      starting_price: String(auction.starting_price || ""),
+      min_increment: String(auction.min_increment || ""),
+      ends_at: auction.ends_at ? auction.ends_at.slice(0, 16) : "",
+      category_id: auction.category_id ? String(auction.category_id) : "",
+      vehicle_id: auction.vehicle_id || "",
+    });
+    setEditAuctionError(null);
+    setEditAuctionNewFiles([]);
+    editAuctionNewPreviews.forEach(u => URL.revokeObjectURL(u));
+    setEditAuctionNewPreviews([]);
+    const [{ data: cats }, { data: veh }] = await Promise.all([
+      supabase.from("categories").select("id,name").neq("id", 11).order("sort_order"),
+      supabase.from("vehicles").select("*").eq("owner_id", user.id).order("created_at", { ascending: false }),
+    ]);
+    setEditAuctionCategories(cats || []);
+    setEditAuctionVehicles(veh || []);
+  };
+
+  const handleSaveAuction = async () => {
+    if (!editAuctionForm.title.trim()) { setEditAuctionError("عنوان المزاد مطلوب"); return; }
+    if (!editAuctionForm.ends_at) { setEditAuctionError("تاريخ النهاية مطلوب"); return; }
+    setEditAuctionSaving(true);
+    setEditAuctionError(null);
+    const isCars = String(editAuctionForm.category_id) === "8";
+    let images = editingAuction.images || [];
+    if (editAuctionNewFiles.length > 0) {
+      for (let i = 0; i < editAuctionNewFiles.length; i++) {
+        const file = editAuctionNewFiles[i];
+        const path = `auctions/${Date.now()}_${i}_${file.name}`;
+        const { error: upErr } = await supabase.storage.from("product-images").upload(path, file, { upsert: false });
+        if (upErr) { setEditAuctionError(`فشل رفع الصورة: ${upErr.message}`); setEditAuctionSaving(false); return; }
+        const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(path);
+        images = [...images, urlData.publicUrl];
+      }
+    }
+    const { error } = await supabase.from("auctions").update({
+      title: editAuctionForm.title.trim(),
+      description: isCars ? null : (editAuctionForm.description.trim() || null),
+      starting_price: Number(editAuctionForm.starting_price),
+      min_increment: editAuctionForm.min_increment ? Number(editAuctionForm.min_increment) : 0,
+      ends_at: editAuctionForm.ends_at,
+      category_id: Number(editAuctionForm.category_id),
+      vehicle_id: isCars ? (editAuctionForm.vehicle_id || null) : null,
+      images,
+    }).eq("id", editingAuction.id);
+    setEditAuctionSaving(false);
+    if (error) { setEditAuctionError(error.message); return; }
+    setEditingAuction(null);
+    editAuctionNewPreviews.forEach(u => URL.revokeObjectURL(u));
+    setEditAuctionNewPreviews([]);
+    setEditAuctionNewFiles([]);
+    setDeleteAuctionSuccess("تم تحديث المزاد بنجاح");
+    setTimeout(() => setDeleteAuctionSuccess(""), 3000);
+    loadSellerAuctions(sellerId);
   };
 
   useEffect(() => {
@@ -2811,7 +2880,10 @@ const SellerDashScreen = ({ session, profile }) => {
                     <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{auction.title}</p>
                     <p style={{ margin: 0, color: T.gold, fontWeight: 800, fontSize: 13 }}>{(auction.current_price || auction.starting_price || 0).toLocaleString("ar-IQ")} د.ع</p>
                   </div>
-                  <Btn size="sm" variant="danger" onClick={() => handleDeleteAuction(auction.id)}>🗑️</Btn>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <Btn size="sm" variant="secondary" onClick={() => handleOpenEditAuction(auction)}>✏️</Btn>
+                    <Btn size="sm" variant="danger" onClick={() => handleDeleteAuction(auction.id)}>🗑️</Btn>
+                  </div>
                 </div>
               </Card>
             );
@@ -2830,6 +2902,74 @@ const SellerDashScreen = ({ session, profile }) => {
           <Btn fullWidth variant="secondary" icon="📊">تصدير التقرير</Btn>
         </div>
       )}
+
+      <Modal isOpen={!!editingAuction} onClose={() => { if (!editAuctionSaving) { setEditingAuction(null); editAuctionNewPreviews.forEach(u => URL.revokeObjectURL(u)); setEditAuctionNewPreviews([]); setEditAuctionNewFiles([]); } }} title="تعديل المزاد ✏️">
+        <Input label="عنوان المزاد *" value={editAuctionForm.title} onChange={v => setEditAuctionForm(f => ({ ...f, title: v }))} placeholder="مثال: تويوتا كامري 2020 للبيع بالمزاد" />
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>الفئة *</label>
+          <select value={editAuctionForm.category_id} onChange={e => setEditAuctionForm(f => ({ ...f, category_id: e.target.value, vehicle_id: "" }))} style={selectStyle}>
+            <option value="">-- اختر الفئة --</option>
+            {editAuctionCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        {String(editAuctionForm.category_id) === "8" ? (
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>المركبة *</label>
+            {editAuctionVehicles.length === 0 ? (
+              <p style={{ color: T.textMuted, fontSize: 12, margin: 0 }}>لا توجد مركبات مسجلة في حسابك</p>
+            ) : (
+              <select value={editAuctionForm.vehicle_id} onChange={e => setEditAuctionForm(f => ({ ...f, vehicle_id: e.target.value }))} style={selectStyle}>
+                <option value="">-- اختر مركبة --</option>
+                {editAuctionVehicles.map(v => <option key={v.id} value={v.id}>{v.brand} {v.model}{v.year ? ` (${v.year})` : ""}{v.plate_number ? ` — ${v.plate_number}` : ""}</option>)}
+              </select>
+            )}
+          </div>
+        ) : (
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>الوصف</label>
+            <textarea value={editAuctionForm.description} onChange={e => setEditAuctionForm(f => ({ ...f, description: e.target.value }))} placeholder="تفاصيل إضافية..." rows={3} style={{ width: "100%", background: T.navyLight, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 12px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box" }} />
+          </div>
+        )}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Input label="السعر الابتدائي (د.ع) *" value={editAuctionForm.starting_price} onChange={v => setEditAuctionForm(f => ({ ...f, starting_price: v.replace(/[^0-9]/g, "") }))} placeholder="0" type="number" />
+          <Input label="أدنى زيادة (د.ع)" value={editAuctionForm.min_increment} onChange={v => setEditAuctionForm(f => ({ ...f, min_increment: v.replace(/[^0-9]/g, "") }))} placeholder="0" type="number" />
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>تاريخ الانتهاء *</label>
+          <input type="datetime-local" value={editAuctionForm.ends_at} onChange={e => setEditAuctionForm(f => ({ ...f, ends_at: e.target.value }))} style={{ width: "100%", background: T.navyLight, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 12px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+        </div>
+        {String(editAuctionForm.category_id) !== "8" && (
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>إضافة صور جديدة (تُضاف للصور الموجودة)</label>
+            {editAuctionNewPreviews.length > 0 && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                {editAuctionNewPreviews.map((url, i) => (
+                  <img key={i} src={url} alt="" style={{ width: 60, height: 60, borderRadius: 8, objectFit: "cover" }} />
+                ))}
+              </div>
+            )}
+            <label style={{ display: "flex", alignItems: "center", gap: 8, background: T.navyLight, border: `1px dashed ${T.navyBorder}`, borderRadius: 10, padding: "10px 14px", cursor: "pointer" }}>
+              <span style={{ fontSize: 18 }}>📷</span>
+              <span style={{ color: T.textSecondary, fontSize: 13 }}>{editAuctionNewFiles.length > 0 ? `${editAuctionNewFiles.length} صورة مختارة` : "اختر صوراً إضافية..."}</span>
+              <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={e => {
+                const files = Array.from(e.target.files || []);
+                if (!files.length) return;
+                editAuctionNewPreviews.forEach(u => URL.revokeObjectURL(u));
+                setEditAuctionNewFiles(files);
+                setEditAuctionNewPreviews(files.map(f => URL.createObjectURL(f)));
+              }} />
+            </label>
+          </div>
+        )}
+        {editAuctionError && (
+          <div style={{ background: `${T.red}22`, border: `1px solid ${T.red}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 12, color: T.red, fontSize: 13, fontWeight: 600 }}>
+            ⚠️ {editAuctionError}
+          </div>
+        )}
+        <Btn fullWidth onClick={handleSaveAuction} disabled={editAuctionSaving}>
+          {editAuctionSaving ? "جارٍ الحفظ..." : "💾 حفظ التعديلات"}
+        </Btn>
+      </Modal>
 
       <Modal isOpen={showAddModal} onClose={() => { setShowAddModal(false); setEditProduct(null); resetForm(); }} title={editProduct ? "تعديل المنتج" : "إضافة منتج جديد"}>
         <Input label="اسم المنتج *" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="مثال: فلتر هواء تويوتا كامري" />
