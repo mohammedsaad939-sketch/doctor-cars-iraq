@@ -2303,6 +2303,10 @@ const SellerDashScreen = ({ session, profile }) => {
   const [orderStatusUpdating, setOrderStatusUpdating] = useState({});
   const [sellerInfo, setSellerInfo] = useState(null);
   const [sellerStats, setSellerStats] = useState({ pendingCount: 0, todayCount: 0, revenue: 0, rating: null });
+  const [sellerAuctions, setSellerAuctions] = useState([]);
+  const [sellerAuctionsLoading, setSellerAuctionsLoading] = useState(false);
+  const [deleteAuctionSuccess, setDeleteAuctionSuccess] = useState("");
+  const [deleteAuctionError, setDeleteAuctionError] = useState("");
 
   const user = session?.user;
 
@@ -2352,8 +2356,34 @@ const SellerDashScreen = ({ session, profile }) => {
     setOrderStatusUpdating(p => ({ ...p, [orderId]: false }));
   };
 
+  const loadSellerAuctions = async (sid) => {
+    setSellerAuctionsLoading(true);
+    const { data } = await supabase.from("auctions").select("*, categories(name)").eq("seller_id", sid).order("created_at", { ascending: false });
+    setSellerAuctions(data || []);
+    setSellerAuctionsLoading(false);
+  };
+
+  const handleDeleteAuction = async (auctionId) => {
+    if (!window.confirm("هل أنت متأكد من حذف هذا المزاد؟")) return;
+    const { data: deleted, error } = await supabase.from("auctions").delete().eq("id", auctionId).select("id");
+    if (error) {
+      setDeleteAuctionError(`فشل الحذف: ${error.message}`);
+      setTimeout(() => setDeleteAuctionError(""), 4000);
+      return;
+    }
+    if (!deleted || deleted.length === 0) {
+      setDeleteAuctionError("لا يمكن حذف هذا المزاد لوجود مزايدات فعلية عليه — هذا لحماية المزايدين");
+      setTimeout(() => setDeleteAuctionError(""), 5000);
+      return;
+    }
+    setSellerAuctions(prev => prev.filter(a => a.id !== auctionId));
+    setDeleteAuctionSuccess("تم حذف المزاد بنجاح");
+    setTimeout(() => setDeleteAuctionSuccess(""), 3000);
+  };
+
   useEffect(() => {
     if (activeTab === "orders" && sellerId) loadSellerOrders(sellerId);
+    if (activeTab === "auctions" && sellerId) loadSellerAuctions(sellerId);
   }, [activeTab, sellerId]);
 
   const selectedCat = categories.find(c => String(c.id) === String(form.category_id));
@@ -2560,6 +2590,7 @@ const SellerDashScreen = ({ session, profile }) => {
           { id: "orders", label: "الطلبات" },
           { id: "products", label: "المنتجات" },
           ...(sellerInfo?.seller_type === "wholesale" || profile?.role === "trader" ? [{ id: "warehouse", label: "مستودعي" }] : []),
+          { id: "auctions", label: "مزاداتي" },
           { id: "reports", label: "التقارير" },
         ]}
         active={activeTab} onChange={setActiveTab}
@@ -2719,6 +2750,51 @@ const SellerDashScreen = ({ session, profile }) => {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === "auctions" && (
+        <div>
+          {deleteAuctionSuccess && (
+            <div style={{ background: `${T.green}22`, border: `1px solid ${T.green}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 12, color: T.green, fontSize: 13, fontWeight: 700 }}>
+              ✓ {deleteAuctionSuccess}
+            </div>
+          )}
+          {deleteAuctionError && (
+            <div style={{ background: `${T.red}22`, border: `1px solid ${T.red}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 12, color: T.red, fontSize: 13, fontWeight: 700 }}>
+              ⚠️ {deleteAuctionError}
+            </div>
+          )}
+          {sellerAuctionsLoading ? (
+            <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>جارٍ التحميل...</div>
+          ) : sellerAuctions.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 40 }}>
+              <div style={{ fontSize: 40, marginBottom: 8 }}>🏷️</div>
+              <p style={{ color: T.textMuted, margin: 0 }}>لا توجد مزادات بعد</p>
+            </div>
+          ) : sellerAuctions.map(auction => {
+            const firstImg = isImageUrl((auction.images || [])[0]) ? auction.images[0] : null;
+            const statusLabel = auction.status === "live" ? "🔴 مباشر" : auction.status === "upcoming" ? "⏳ قادم" : "✅ منتهي";
+            const statusColor = auction.status === "live" ? T.red : auction.status === "upcoming" ? T.gold : T.textMuted;
+            return (
+              <Card key={auction.id} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                  <div style={{ width: 64, height: 64, borderRadius: 10, background: T.navyLight, overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>
+                    {firstImg ? <img src={firstImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🏆"}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                      <span style={{ color: statusColor, fontWeight: 700, fontSize: 11 }}>{statusLabel}</span>
+                      {auction.categories?.name && <span style={{ color: T.textMuted, fontSize: 11 }}>{auction.categories.name}</span>}
+                    </div>
+                    <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{auction.title}</p>
+                    <p style={{ margin: 0, color: T.gold, fontWeight: 800, fontSize: 13 }}>{(auction.current_price || auction.starting_price || 0).toLocaleString("ar-IQ")} د.ع</p>
+                  </div>
+                  <Btn size="sm" variant="danger" onClick={() => handleDeleteAuction(auction.id)}>🗑️</Btn>
+                </div>
+              </Card>
+            );
+          })}
         </div>
       )}
 
