@@ -1312,7 +1312,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
     setAuctionImagePreviews([]);
     setShowCreateModal(true);
     const [{ data: cats }, { data: veh }] = await Promise.all([
-      supabase.from("categories").select("id,name").order("sort_order"),
+      supabase.from("categories").select("id,name").neq("id", 11).order("sort_order"),
       supabase.from("vehicles").select("*").eq("owner_id", user.id).order("created_at", { ascending: false }),
     ]);
     setAuctionCategories(cats || []);
