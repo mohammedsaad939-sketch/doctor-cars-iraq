@@ -224,6 +224,73 @@ const Section = ({ title, subtitle, action, children }) => (
 );
 
 // ═══════════════════════════════════════════════════════
+// AD CAROUSEL
+// ═══════════════════════════════════════════════════════
+const AdCarousel = ({ onProductView, onNavigate }) => {
+  const [ads, setAds] = useState([]);
+  const [idx, setIdx] = useState(0);
+  const [touchStartX, setTouchStartX] = useState(null);
+
+  useEffect(() => {
+    supabase.from("ads").select("id,title,image_url,link_type,link_target_id,external_url").order("sort_order", { ascending: true }).then(({ data }) => {
+      setAds(data || []);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (ads.length <= 1) return;
+    const t = setInterval(() => setIdx(i => (i + 1) % ads.length), 5000);
+    return () => clearInterval(t);
+  }, [ads.length]);
+
+  const handleTap = async (ad) => {
+    if (ad.link_type === "external" && ad.external_url) {
+      window.open(ad.external_url, "_blank");
+    } else if (ad.link_type === "product" && ad.link_target_id) {
+      const { data } = await supabase.from("products").select("*, categories(name)").eq("id", ad.link_target_id).maybeSingle();
+      if (data) onProductView({ ...data, image: Array.isArray(data.images) ? (data.images[0] || "📦") : (data.images || "📦"), category: data.categories?.name || "", oldPrice: data.old_price || null, rating: data.rating || 0, reviews: 0 });
+    } else if (ad.link_type === "seller_store") {
+      onNavigate("sellerProfile");
+    }
+  };
+
+  const handleTouchStart = (e) => setTouchStartX(e.touches[0].clientX);
+  const handleTouchEnd = (e) => {
+    if (touchStartX === null) return;
+    const dx = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(dx) > 40) setIdx(i => dx > 0 ? (i + 1) % ads.length : (i - 1 + ads.length) % ads.length);
+    setTouchStartX(null);
+  };
+
+  if (ads.length === 0) return null;
+  const ad = ads[idx];
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div
+        onClick={() => handleTap(ad)}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        style={{ position: "relative", width: "100%", height: 190, borderRadius: 16, overflow: "hidden", cursor: "pointer", background: T.navyCard }}
+      >
+        {ad.image_url && (
+          <img src={ad.image_url} alt={ad.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        )}
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%)", padding: "20px 16px 12px" }}>
+          <span style={{ color: "#fff", fontWeight: 700, fontSize: 15, textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>{ad.title}</span>
+        </div>
+      </div>
+      {ads.length > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 8 }}>
+          {ads.map((_, i) => (
+            <div key={i} onClick={() => setIdx(i)} style={{ width: i === idx ? 18 : 7, height: 7, borderRadius: 4, background: i === idx ? T.gold : T.navyBorder, transition: "all 0.3s", cursor: "pointer" }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // PRODUCT CARD
 // ═══════════════════════════════════════════════════════
 const ProductCard = ({ product, onView, onCart }) => (
@@ -593,6 +660,9 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
       </div>
 
       <div style={{ padding: "0 16px" }}>
+        {/* AD CAROUSEL */}
+        <AdCarousel onProductView={onProductView} onNavigate={onNavigate} />
+
         {/* HERO BANNER */}
         <div style={{ background: `linear-gradient(135deg, #0F2A5E, #1A3A7A)`, borderRadius: 20, padding: 20, marginBottom: 20, border: `1px solid ${T.navyBorder}`, position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: -20, left: -20, width: 120, height: 120, background: `${T.gold}15`, borderRadius: "50%", filter: "blur(30px)" }} />
