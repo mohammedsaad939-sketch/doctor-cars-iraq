@@ -1292,6 +1292,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
   const [bidState, setBidState] = useState({}); // { [auctionId]: { loading, success, error } }
   const [lastBidsMap, setLastBidsMap] = useState({}); // { [auctionId]: { bidder_id } }
   const [winnerBidsMap, setWinnerBidsMap] = useState({}); // { [auctionId]: winningAmount }
+  const [galleryIdx, setGalleryIdx] = useState({}); // { [auctionId]: number }
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({ title: "", description: "", starting_price: "", min_increment: "", starts_at: "", ends_at: "", category_id: "", vehicle_id: "" });
   const [auctionCategories, setAuctionCategories] = useState([]);
@@ -1529,9 +1530,32 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                     <span style={{ color: T.gold, fontWeight: 700, fontSize: 12 }}>يبدأ: {new Date(auction.starts_at).toLocaleDateString("ar-IQ")}</span>
                   )}
                 </div>
-                <div style={{ fontSize: firstImg ? undefined : 48, textAlign: "center", background: T.navyLight, borderRadius: 12, padding: firstImg ? 0 : "16px 0", marginBottom: 12, overflow: "hidden" }}>
-                  {firstImg ? <img src={firstImg} alt={auction.title} style={{ width: "100%", height: 160, objectFit: "cover", borderRadius: 12 }} /> : "🏆"}
-                </div>
+                {(() => {
+                  const gIdx = galleryIdx[auction.id] || 0;
+                  const setG = (n) => setGalleryIdx(p => ({ ...p, [auction.id]: (n + displayImages.length) % displayImages.length }));
+                  return displayImages.length > 0 ? (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", height: 160, background: T.navyLight }}>
+                        <img src={displayImages[gIdx]} alt={auction.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        {displayImages.length > 1 && (
+                          <>
+                            <button onClick={() => setG(gIdx - 1)} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 30, height: 30, color: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
+                            <button onClick={() => setG(gIdx + 1)} style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 30, height: 30, color: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
+                          </>
+                        )}
+                      </div>
+                      {displayImages.length > 1 && (
+                        <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 7 }}>
+                          {displayImages.map((_, i) => (
+                            <div key={i} onClick={() => setG(i)} style={{ width: gIdx === i ? 16 : 6, height: 6, borderRadius: 3, background: gIdx === i ? T.gold : T.navyBorder, cursor: "pointer", transition: "all 0.2s", flexShrink: 0 }} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 48, textAlign: "center", background: T.navyLight, borderRadius: 12, padding: "16px 0", marginBottom: 12 }}>🏆</div>
+                  );
+                })()}
                 {hasVehicle && (
                   <div style={{ background: T.navyMid, borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
                     <div style={{ color: T.gold, fontWeight: 800, fontSize: 12, marginBottom: 6 }}>🚗 تفاصيل المركبة</div>
@@ -1552,13 +1576,6 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                         <div><div style={{ color: T.textMuted, fontSize: 10, marginBottom: 2 }}>المسافة المقطوعة</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{Number(auction.vehicles.mileage_km).toLocaleString("ar-IQ")} كم</div></div>
                       )}
                     </div>
-                    {displayImages.length > 1 && (
-                      <div style={{ display: "flex", gap: 6, marginTop: 8, overflowX: "auto" }}>
-                        {displayImages.slice(1).map((url, i) => (
-                          <img key={i} src={url} alt="" style={{ width: 52, height: 52, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
-                        ))}
-                      </div>
-                    )}
                   </div>
                 )}
                 <h3 style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 15, fontWeight: 800 }}>{auction.title}</h3>
