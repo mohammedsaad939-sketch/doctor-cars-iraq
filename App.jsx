@@ -1453,7 +1453,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
       const { data: myBids } = await supabase.from("bids").select("auction_id").eq("bidder_id", user.id);
       const ids = [...new Set((myBids || []).map(b => b.auction_id))];
       if (!ids.length) { setLoading(false); return; }
-      const { data } = await supabase.from("auctions").select("*, sellers(store_name), vehicles(*)").in("id", ids);
+      const { data } = await supabase.from("auctions").select("*, sellers(store_name, phone, whatsapp), vehicles(*)").in("id", ids);
       setAuctions(data || []);
       // جلب آخر مزايدة لكل مزاد لمعرفة من هو الأعلى حالياً
       const { data: latestBids } = await supabase
@@ -1467,7 +1467,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
       return;
     }
 
-    let q = supabase.from("auctions").select("*, sellers(store_name), vehicles(*)");
+    let q = supabase.from("auctions").select("*, sellers(store_name, phone, whatsapp), vehicles(*)");
     if (tab === "live")       q = q.eq("status", "live").order("ends_at");
     else if (tab === "upcoming") q = q.eq("status", "upcoming").order("starts_at");
     else if (tab === "ended")    q = q.eq("status", "ended").order("ends_at", { ascending: false });
@@ -1642,6 +1642,21 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                     </div>
                   );
                 })()}
+                {(auction.sellers?.phone || auction.sellers?.whatsapp) && (
+                  <div style={{ background: T.navyMid, borderRadius: 10, padding: "10px 12px", marginTop: 10, display: "flex", gap: 8, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+                    <span style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, flexBasis: "100%", textAlign: "center", marginBottom: 4 }}>📞 تواصل مع البائع</span>
+                    {auction.sellers.phone && (
+                      <a href={`tel:${auction.sellers.phone}`} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${T.blue}22`, color: T.blue, border: `1px solid ${T.blue}44`, borderRadius: 8, padding: "6px 14px", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
+                        📱 اتصال
+                      </a>
+                    )}
+                    {auction.sellers.whatsapp && (
+                      <a href={`https://wa.me/${auction.sellers.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#25D36622", color: "#25D366", border: "1px solid #25D36644", borderRadius: 8, padding: "6px 14px", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
+                        💬 واتساب
+                      </a>
+                    )}
+                  </div>
+                )}
                 {auction.sellers?.store_name && (
                   <p style={{ margin: "8px 0 0", color: T.textMuted, fontSize: 11, textAlign: "center" }}>
                     {auction.min_increment ? `أدنى زيادة: ${auction.min_increment.toLocaleString("ar-IQ")} د.ع | ` : ""}البائع: {auction.sellers.store_name}
