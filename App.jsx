@@ -1717,6 +1717,10 @@ const AuctionsScreen = ({ onNavigate, session }) => {
               <input type="datetime-local" value={createForm.ends_at} onChange={e => setCreateForm(f => ({ ...f, ends_at: e.target.value }))} style={{ width: "100%", background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 12px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
             </div>
             {createError && <p style={{ color: T.red, fontSize: 13, marginBottom: 12, fontWeight: 600 }}>{createError}</p>}
+            <div style={{ background: `${T.gold}11`, border: `1px solid ${T.gold}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 14, display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 15, flexShrink: 0 }}>⚠️</span>
+              <p style={{ margin: 0, color: T.textSecondary, fontSize: 12, lineHeight: 1.6 }}>تنبيه: لا يمكن حذف المزاد بعد استلام أي مزايدة عليه، حمايةً لحقوق المزايدين. تأكد من جميع التفاصيل قبل النشر.</p>
+            </div>
             <Btn fullWidth onClick={handleCreateAuction} disabled={creating || (String(createForm.category_id) === "8" && sellerVehicles.length === 0)}>{creating ? "جارٍ الإنشاء..." : "إنشاء المزاد"}</Btn>
           </>
         )}
