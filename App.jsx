@@ -2001,6 +2001,7 @@ const GarageScreen = ({ session }) => {
   const [imagePreviews, setImagePreviews] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [deleteVehicleMsg, setDeleteVehicleMsg] = useState(null);
 
   const uid = session?.user?.id;
 
@@ -2036,6 +2037,26 @@ const GarageScreen = ({ session }) => {
     setImageFiles([]);
     setImagePreviews([]);
     setSaveError(null);
+  };
+
+  const handleDeleteVehicle = async (vehicleId) => {
+    if (!window.confirm("هل أنت متأكد من حذف هذه المركبة؟ لا يمكن التراجع عن هذا الإجراء.")) return;
+    const { error } = await supabase.from("vehicles").delete().eq("id", vehicleId);
+    if (error) {
+      const msg = (error.code === "23503" || error.message.includes("violates foreign key") || error.message.includes("foreign key"))
+        ? "لا يمكن حذف هذه المركبة لأنها مرتبطة بمزاد فعّال"
+        : `فشل الحذف: ${error.message}`;
+      setDeleteVehicleMsg({ isError: true, text: msg });
+      setTimeout(() => setDeleteVehicleMsg(null), 4000);
+      return;
+    }
+    setVehicles(prev => {
+      const remaining = prev.filter(v => v.id !== vehicleId);
+      setActiveIdx(i => Math.max(0, Math.min(i, remaining.length - 1)));
+      return remaining;
+    });
+    setDeleteVehicleMsg({ isError: false, text: "تم حذف المركبة بنجاح" });
+    setTimeout(() => setDeleteVehicleMsg(null), 3000);
   };
 
   const handleAddVehicle = async () => {
@@ -2094,6 +2115,12 @@ const GarageScreen = ({ session }) => {
         <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 20, fontWeight: 800 }}>🚗 مركبتي</h2>
         <Btn size="sm" onClick={() => { setSaveError(null); setShowAddVehicle(true); }} icon="+">إضافة</Btn>
       </div>
+
+      {deleteVehicleMsg && (
+        <div style={{ background: deleteVehicleMsg.isError ? `${T.red}22` : `${T.green}22`, border: `1px solid ${deleteVehicleMsg.isError ? T.red : T.green}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 12, color: deleteVehicleMsg.isError ? T.red : T.green, fontSize: 13, fontWeight: 700 }}>
+          {deleteVehicleMsg.isError ? "⚠️ " : "✓ "}{deleteVehicleMsg.text}
+        </div>
+      )}
 
       {vehicles.length === 0 ? (
         <Card style={{ textAlign: "center", padding: 40 }}>
@@ -2167,6 +2194,9 @@ const GarageScreen = ({ session }) => {
                   ))}
                 </div>
               )}
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+                <Btn size="sm" variant="danger" onClick={() => handleDeleteVehicle(vehicle.id)}>🗑️ حذف المركبة</Btn>
+              </div>
             </Card>
           )}
 
