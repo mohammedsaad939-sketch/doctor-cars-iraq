@@ -1293,6 +1293,8 @@ const AuctionsScreen = ({ onNavigate, session }) => {
   const [lastBidsMap, setLastBidsMap] = useState({}); // { [auctionId]: { bidder_id } }
   const [winnerBidsMap, setWinnerBidsMap] = useState({}); // { [auctionId]: winningAmount }
   const [galleryIdx, setGalleryIdx] = useState({}); // { [auctionId]: number }
+  const [userBidsMap, setUserBidsMap] = useState({}); // { [auctionId]: [{ id, amount, created_at }] }
+  const [bidDeleteState, setBidDeleteState] = useState({}); // { [bidId]: { loading, error } }
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({ title: "", description: "", starting_price: "", min_increment: "", starts_at: "", ends_at: "", category_id: "", vehicle_id: "" });
   const [auctionCategories, setAuctionCategories] = useState([]);
@@ -1397,6 +1399,23 @@ const AuctionsScreen = ({ onNavigate, session }) => {
     }
   };
 
+  const handleDeleteBid = async (bidId, auctionId) => {
+    if (!window.confirm("هل أنت متأكد من حذف هذه المزايدة؟ لا يمكن التراجع عن هذا الإجراء.")) return;
+    setBidDeleteState(p => ({ ...p, [bidId]: { loading: true, error: null } }));
+    const { error } = await supabase.from("bids").delete().eq("id", bidId);
+    if (error) {
+      setBidDeleteState(p => ({ ...p, [bidId]: { error: error.message } }));
+      setTimeout(() => setBidDeleteState(p => ({ ...p, [bidId]: {} })), 4000);
+      return;
+    }
+    setBidDeleteState(p => ({ ...p, [bidId]: {} }));
+    setUserBidsMap(prev => {
+      const updated = { ...prev };
+      if (updated[auctionId]) updated[auctionId] = updated[auctionId].filter(b => b.id !== bidId);
+      return updated;
+    });
+  };
+
   // Countdown ticker — runs only on "live" tab
   useEffect(() => {
     if (activeTab !== "live") return;
@@ -1457,11 +1476,19 @@ const AuctionsScreen = ({ onNavigate, session }) => {
       setAuctions(data || []);
       // جلب آخر مزايدة لكل مزاد لمعرفة من هو الأعلى حالياً
       const { data: latestBids } = await supabase
-        .from("bids").select("auction_id, bidder_id, amount")
+        .from("bids").select("id, auction_id, bidder_id, amount, created_at")
         .in("auction_id", ids).order("created_at", { ascending: false });
       const map = {};
-      (latestBids || []).forEach(b => { if (!map[b.auction_id]) map[b.auction_id] = b; });
+      const myBidsMap = {};
+      (latestBids || []).forEach(b => {
+        if (!map[b.auction_id]) map[b.auction_id] = b;
+        if (b.bidder_id === user.id) {
+          if (!myBidsMap[b.auction_id]) myBidsMap[b.auction_id] = [];
+          myBidsMap[b.auction_id].push(b);
+        }
+      });
       setLastBidsMap(map);
+      setUserBidsMap(myBidsMap);
       await loadWinnerBids(data || []);
       setLoading(false);
       return;
@@ -1642,6 +1669,25 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                     </div>
                   );
                 })()}
+                {activeTab === "mine" && auction.status === "ended" && userBidsMap[auction.id]?.length > 0 && (
+                  <div style={{ marginTop: 10, background: T.navyMid, borderRadius: 10, padding: "10px 12px" }}>
+                    <p style={{ margin: "0 0 8px", color: T.textSecondary, fontSize: 12, fontWeight: 700 }}>📋 مزايداتي في هذا المزاد</p>
+                    {userBidsMap[auction.id].map(bid => {
+                      const ds = bidDeleteState[bid.id] || {};
+                      return (
+                        <div key={bid.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: `1px solid ${T.navyBorder}` }}>
+                          <span style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>{bid.amount.toLocaleString("ar-IQ")} د.ع</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            {ds.error && <span style={{ color: T.red, fontSize: 11 }}>{ds.error}</span>}
+                            <button onClick={() => handleDeleteBid(bid.id, auction.id)} disabled={ds.loading} style={{ background: `${T.red}22`, border: `1px solid ${T.red}44`, color: T.red, borderRadius: 7, padding: "4px 10px", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                              {ds.loading ? "..." : "🗑️"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {(auction.sellers?.phone || auction.sellers?.whatsapp) && (
                   <div style={{ background: T.navyMid, borderRadius: 10, padding: "10px 12px", marginTop: 10, display: "flex", gap: 8, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
                     <span style={{ color: T.textSecondary, fontSize: 12, fontWeight: 700, flexBasis: "100%", textAlign: "center", marginBottom: 4 }}>📞 تواصل مع البائع</span>
