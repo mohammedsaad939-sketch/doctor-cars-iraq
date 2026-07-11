@@ -131,6 +131,15 @@ const Stars = ({ rating, size = 12 }) => {
 
 const isImageUrl = (v) => typeof v === "string" && v.startsWith("http");
 
+const toWhatsAppNumber = (phone) => {
+  if (!phone) return "";
+  let d = String(phone).replace(/[\s\-()]/g, "");
+  if (d.startsWith("+")) d = d.slice(1);
+  if (d.startsWith("964")) return d;
+  if (d.startsWith("0")) return "964" + d.slice(1);
+  return "964" + d;
+};
+
 const Btn = ({ children, onClick, variant = "primary", size = "md", disabled = false, fullWidth = false, icon = null }) => {
   const styles = {
     primary: { background: `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`, color: T.navy, border: "none" },
@@ -897,7 +906,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <Btn fullWidth variant="primary" icon="📱" onClick={() => window.open(`tel:${selectedListing.contact_phone}`)}>اتصال</Btn>
-              <Btn fullWidth variant="ghost" icon="💬" onClick={() => window.open(`https://wa.me/964${selectedListing.contact_phone.replace(/^0/, "")}`)}>واتساب</Btn>
+              <Btn fullWidth variant="ghost" icon="💬" onClick={() => window.open(`https://wa.me/${toWhatsAppNumber(selectedListing.contact_phone)}`)}>واتساب</Btn>
               <Btn size="sm" variant="secondary" icon="↗️" onClick={() => {
                 const text = encodeURIComponent(`شاهد هذا على دكتور السيارات:\n${selectedListing.title} - ${Number(selectedListing.price).toLocaleString("ar-IQ")} د.ع\n${window.location.href}`);
                 window.open(`https://wa.me/?text=${text}`);
@@ -1293,6 +1302,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
   const [lastBidsMap, setLastBidsMap] = useState({}); // { [auctionId]: { bidder_id } }
   const [winnerBidsMap, setWinnerBidsMap] = useState({}); // { [auctionId]: winningAmount }
   const [galleryIdx, setGalleryIdx] = useState({}); // { [auctionId]: number }
+  const [lightbox, setLightbox] = useState(null); // auctionId or null
   const [userBidsMap, setUserBidsMap] = useState({}); // { [auctionId]: [{ id, amount, created_at }] }
   const [bidDeleteState, setBidDeleteState] = useState({}); // { [bidId]: { loading, error } }
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -1563,7 +1573,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                   return displayImages.length > 0 ? (
                     <div style={{ marginBottom: 12 }}>
                       <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", height: 160, background: T.navyLight }}>
-                        <img src={displayImages[gIdx]} alt={auction.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        <img src={displayImages[gIdx]} alt={auction.title} onClick={() => setLightbox(auction.id)} style={{ width: "100%", height: "100%", objectFit: "cover", cursor: "pointer" }} />
                         {displayImages.length > 1 && (
                           <>
                             <button onClick={() => setG(gIdx - 1)} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 30, height: 30, color: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
@@ -1697,7 +1707,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                       </a>
                     )}
                     {auction.sellers.whatsapp && (
-                      <a href={`https://wa.me/${auction.sellers.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#25D36622", color: "#25D366", border: "1px solid #25D36644", borderRadius: 8, padding: "6px 14px", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
+                      <a href={`https://wa.me/${toWhatsAppNumber(auction.sellers.whatsapp)}`} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#25D36622", color: "#25D366", border: "1px solid #25D36644", borderRadius: 8, padding: "6px 14px", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
                         💬 واتساب
                       </a>
                     )}
@@ -1722,6 +1732,59 @@ const AuctionsScreen = ({ onNavigate, session }) => {
           )}
         </div>
       )}
+
+      {lightbox !== null && (() => {
+        const lbAuction = auctions.find(a => a.id === lightbox);
+        if (!lbAuction) return null;
+        const lbHasVehicle = !!lbAuction.vehicle_id && lbAuction.vehicles;
+        const lbImages = lbHasVehicle ? (lbAuction.vehicles.images || []) : (lbAuction.images || []);
+        const lbIdx = galleryIdx[lightbox] || 0;
+        const lbSetG = (n) => setGalleryIdx(p => ({ ...p, [lightbox]: (n + lbImages.length) % lbImages.length }));
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.95)", display: "flex", flexDirection: "column" }}>
+            <button onClick={() => setLightbox(null)} style={{ position: "absolute", top: 16, right: 16, zIndex: 10000, background: "rgba(255,255,255,0.18)", border: "none", borderRadius: "50%", width: 40, height: 40, color: "#fff", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>✕</button>
+            <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
+              <img src={lbImages[lbIdx]} alt={lbAuction.title} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+              {lbImages.length > 1 && (
+                <>
+                  <button onClick={() => lbSetG(lbIdx - 1)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 36, height: 36, color: "#fff", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
+                  <button onClick={() => lbSetG(lbIdx + 1)} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 36, height: 36, color: "#fff", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
+                </>
+              )}
+            </div>
+            {lbImages.length > 1 && (
+              <div style={{ display: "flex", justifyContent: "center", gap: 5, padding: "8px 0" }}>
+                {lbImages.map((_, i) => (
+                  <div key={i} onClick={() => lbSetG(i)} style={{ width: lbIdx === i ? 16 : 6, height: 6, borderRadius: 3, background: lbIdx === i ? T.gold : "rgba(255,255,255,0.3)", cursor: "pointer", transition: "all 0.2s", flexShrink: 0 }} />
+                ))}
+              </div>
+            )}
+            <div style={{ background: T.navyCard, padding: "14px 16px", overflowY: "auto", maxHeight: "35vh" }}>
+              <h3 style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 15, fontWeight: 800 }}>{lbAuction.title}</h3>
+              <p style={{ margin: "0 0 10px", color: T.gold, fontWeight: 900, fontSize: 16 }}>{(lbAuction.current_price || lbAuction.starting_price || 0).toLocaleString("ar-IQ")} د.ع</p>
+              {lbHasVehicle && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                  {lbAuction.vehicles.brand && lbAuction.vehicles.model && (
+                    <div><div style={{ color: T.textMuted, fontSize: 10, marginBottom: 2 }}>الموديل</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{lbAuction.vehicles.brand} {lbAuction.vehicles.model}</div></div>
+                  )}
+                  {lbAuction.vehicles.year && (
+                    <div><div style={{ color: T.textMuted, fontSize: 10, marginBottom: 2 }}>سنة الصنع</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{lbAuction.vehicles.year}</div></div>
+                  )}
+                  {lbAuction.vehicles.chassis_number && (
+                    <div><div style={{ color: T.textMuted, fontSize: 10, marginBottom: 2 }}>رقم الشاصي</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 11 }}>{lbAuction.vehicles.chassis_number}</div></div>
+                  )}
+                  {lbAuction.vehicles.import_origin && (
+                    <div><div style={{ color: T.textMuted, fontSize: 10, marginBottom: 2 }}>أصل الاستيراد</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{lbAuction.vehicles.import_origin === "american" ? "وارد أمريكي" : "وارد خليجي"}</div></div>
+                  )}
+                  {lbAuction.vehicles.mileage_km != null && (
+                    <div><div style={{ color: T.textMuted, fontSize: 10, marginBottom: 2 }}>المسافة المقطوعة</div><div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12 }}>{Number(lbAuction.vehicles.mileage_km).toLocaleString("ar-IQ")} كم</div></div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       <Modal isOpen={showCreateModal} onClose={() => { if (!creating) { auctionImagePreviews.forEach(u => URL.revokeObjectURL(u)); setAuctionImagePreviews([]); setAuctionImageFiles([]); setShowCreateModal(false); } }} title="إنشاء مزاد جديد 🏷️">
         {createSuccess ? (
