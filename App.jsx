@@ -509,6 +509,8 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
   const [publishSuccess, setPublishSuccess] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [homeCategories, setHomeCategories] = useState([]);
+  const [categoryCounts, setCategoryCounts] = useState({});
 
   useEffect(() => {
     const timer = setInterval(() => setActiveAuction(p => (p + 1) % MOCK.auctions.length), 5000);
@@ -553,6 +555,24 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
     supabase.from("categories").select("id,name").order("sort_order").then(({ data }) => {
       if (data) setPublishCategories(data);
     });
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      const { data: cats } = await supabase.from("categories").select("id,name").order("sort_order");
+      if (!cats) return;
+      setHomeCategories(cats);
+      const counts = {};
+      await Promise.all(cats.map(async (cat) => {
+        const { count } = await supabase
+          .from("products")
+          .select("id", { count: "exact", head: true })
+          .eq("category_id", cat.id)
+          .eq("status", "active");
+        counts[cat.id] = count || 0;
+      }));
+      setCategoryCounts(counts);
+    })();
   }, []);
 
   const handlePublishSubmit = async () => {
@@ -719,21 +739,27 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
         </div>
 
         {/* CATEGORIES GRID */}
-        <Section title="الأقسام" subtitle="تصفح جميع الخدمات" action={{ label: "الكل", onClick: () => onNavigate("categories") }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-            {MOCK.categories.slice(0, 8).map(cat => (
-              <button key={cat.id} onClick={() => onNavigate("shop")} style={{
-                background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 14,
-                padding: "12px 4px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-                cursor: "pointer", transition: "all 0.2s",
-              }}>
-                <div style={{ width: 40, height: 40, borderRadius: 12, background: `${cat.color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{cat.icon}</div>
-                <span style={{ color: T.textPrimary, fontSize: 10, fontWeight: 700, textAlign: "center", lineHeight: 1.3 }}>{cat.name}</span>
-                <span style={{ color: T.textMuted, fontSize: 9 }}>{cat.count.toLocaleString("ar-IQ")}</span>
-              </button>
-            ))}
-          </div>
-        </Section>
+        {(() => {
+          const CAT_ICONS = ["🔧", "🚗", "🛞", "⚡", "🔩", "🛡️", "⚙️", "🔌", "🛢️", "🔦", "🪛", "🔑"];
+          const CAT_COLORS = [T.gold, T.blue, T.green, T.red, T.orange, "#9B59B6", "#1ABC9C", "#E67E22", "#3498DB", "#E74C3C", "#2ECC71", "#F39C12"];
+          return (
+            <Section title="الأقسام" subtitle="تصفح جميع الخدمات" action={{ label: "الكل", onClick: () => onNavigate("shop") }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                {homeCategories.slice(0, 8).map((cat, i) => (
+                  <button key={cat.id} onClick={() => onNavigate("shop", cat.name)} style={{
+                    background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 14,
+                    padding: "12px 4px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                    cursor: "pointer", transition: "all 0.2s",
+                  }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: `${CAT_COLORS[i % CAT_COLORS.length]}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{CAT_ICONS[i % CAT_ICONS.length]}</div>
+                    <span style={{ color: T.textPrimary, fontSize: 10, fontWeight: 700, textAlign: "center", lineHeight: 1.3 }}>{cat.name}</span>
+                    <span style={{ color: T.textMuted, fontSize: 9 }}>{(categoryCounts[cat.id] || 0).toLocaleString("ar-IQ")}</span>
+                  </button>
+                ))}
+              </div>
+            </Section>
+          );
+        })()}
 
         {/* EMERGENCY QUICK ACCESS */}
         <div style={{ background: `${T.red}15`, border: `1px solid ${T.red}33`, borderRadius: 16, padding: 16, marginBottom: 20 }}>
@@ -942,7 +968,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
 };
 
 // ── SHOP SCREEN ──────────────────────────────────────
-const ShopScreen = ({ onProductView, onCartAdd }) => {
+const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null }) => {
   const [products, setProducts] = useState(MOCK.products);
   useEffect(() => {
     supabase.from("products").select("*, sellers(store_name, verified, rating), categories(name)").then(({ data, error }) => {
@@ -974,7 +1000,7 @@ const ShopScreen = ({ onProductView, onCartAdd }) => {
     });
   }, []);
 
-  const [activeCategory, setActiveCategory] = useState("الكل");
+  const [activeCategory, setActiveCategory] = useState(initialCategory || "الكل");
   const [sortBy, setSortBy] = useState("default");
   const [priceRange, setPriceRange] = useState([0, 500000]);
   const [showFilters, setShowFilters] = useState(false);
@@ -4032,9 +4058,12 @@ export default function DoctorCarsApp() {
   const [cartToast, setCartToast] = useState(null);
   const [prevScreen, setPrevScreen] = useState("home");
   const [roleDone, setRoleDone] = useState(!!sessionStorage.getItem("role_selected"));
+  const [selectedCategory, setSelectedCategory] = useState(null);
 
-  const navigate = (screen) => {
+  const navigate = (screen, meta = null) => {
     setPrevScreen(currentScreen);
+    if (screen === "shop" && meta) setSelectedCategory(meta);
+    else if (screen !== "shop") setSelectedCategory(null);
     setCurrentScreen(screen);
   };
 
@@ -4133,7 +4162,7 @@ export default function DoctorCarsApp() {
   const renderScreen = () => {
     switch (currentScreen) {
       case "home": return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} profile={profile} session={session} />;
-      case "shop": return <ShopScreen onProductView={handleProductView} onCartAdd={handleCartAdd} />;
+      case "shop": return <ShopScreen onProductView={handleProductView} onCartAdd={handleCartAdd} initialCategory={selectedCategory} />;
       case "auctions": return <AuctionsScreen onNavigate={navigate} session={session} />;
       case "garage": return <GarageScreen session={session} />;
       case "profile": return <ProfileScreen onLogout={signOut} onNavigate={navigate} profile={profile} session={session} />;
