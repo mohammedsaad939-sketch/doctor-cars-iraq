@@ -1059,6 +1059,8 @@ const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null }) => {
   const [priceRange, setPriceRange] = useState([0, 500000]);
   const [showFilters, setShowFilters] = useState(false);
   const [shopCategories, setShopCategories] = useState([]);
+  const [activeFilters, setActiveFilters] = useState(new Set());
+  const [shopToast, setShopToast] = useState(null);
 
   useEffect(() => {
     supabase.from("categories").select("id,name").order("sort_order").then(({ data }) => {
@@ -1069,7 +1071,10 @@ const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null }) => {
   const categoryTabs = ["الكل", ...shopCategories.map(c => c.name)];
   const filtered = products.filter(p =>
     (activeCategory === "الكل" || p.category === activeCategory) &&
-    p.price >= priceRange[0] && p.price <= priceRange[1]
+    p.price >= priceRange[0] && p.price <= priceRange[1] &&
+    (!activeFilters.has("موثق فقط") || p.sellerVerified) &&
+    (!activeFilters.has("جديد") || p.condition === "new") &&
+    (!activeFilters.has("متوفر") || p.stock > 0)
   );
 
   return (
@@ -1108,10 +1113,17 @@ const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null }) => {
         <Card style={{ marginBottom: 16 }}>
           <h4 style={{ margin: "0 0 12px", color: T.textPrimary }}>الفلاتر المتقدمة</h4>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {["موثق فقط", "جديد", "متوفر", "توصيل"].map(f => (
-              <button key={f} style={{ background: T.navyLight, border: `1px solid ${T.navyBorder}`, borderRadius: 20, padding: "6px 14px", color: T.textSecondary, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>{f}</button>
-            ))}
+            {["موثق فقط", "جديد", "متوفر", "توصيل"].map(f => {
+              const isActive = activeFilters.has(f);
+              return (
+                <button key={f} onClick={() => {
+                  if (f === "توصيل") { setShopToast("خاصية التوصيل قريباً!"); setTimeout(() => setShopToast(null), 2500); return; }
+                  setActiveFilters(prev => { const next = new Set(prev); isActive ? next.delete(f) : next.add(f); return next; });
+                }} style={{ background: isActive ? `linear-gradient(135deg, ${T.gold}, ${T.goldDark})` : T.navyLight, border: `1px solid ${isActive ? "transparent" : T.navyBorder}`, borderRadius: 20, padding: "6px 14px", color: isActive ? T.navy : T.textSecondary, fontFamily: "inherit", fontWeight: isActive ? 700 : 400, fontSize: 12, cursor: "pointer" }}>{f}</button>
+              );
+            })}
           </div>
+          {shopToast && <div style={{ marginTop: 8, background: `${T.gold}22`, border: `1px solid ${T.gold}44`, borderRadius: 8, padding: "8px 12px", color: T.gold, fontSize: 12, textAlign: "center" }}>{shopToast}</div>}
           <div style={{ marginTop: 14 }}>
             <label style={{ color: T.textSecondary, fontSize: 13, display: "block", marginBottom: 6 }}>
               نطاق السعر: <span style={{ color: T.gold }}>{priceRange[0].toLocaleString("ar-IQ")} - {priceRange[1].toLocaleString("ar-IQ")} د.ع</span>
@@ -1141,6 +1153,13 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile }) =
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [sellerInfo, setSellerInfo] = useState(null);
   const [sellerProductCount, setSellerProductCount] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [hasReviewed, setHasReviewed] = useState(false);
+  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: "" });
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState(null);
+  const [reviewSuccess, setReviewSuccess] = useState(false);
 
   useEffect(() => {
     if (!product?.seller_id) return;
@@ -1150,6 +1169,33 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile }) =
     supabase.from("products").select("id", { count: "exact", head: true }).eq("seller_id", sid)
       .then(({ count }) => setSellerProductCount(count || 0));
   }, [product?.seller_id]);
+
+  useEffect(() => {
+    if (!product?.id) return;
+    setReviewsLoading(true);
+    supabase.from("product_reviews").select("*, profiles(full_name)").eq("product_id", product.id).order("created_at", { ascending: false })
+      .then(({ data }) => {
+        setReviews(data || []);
+        if (session?.user?.id) setHasReviewed((data || []).some(r => r.user_id === session.user.id));
+        setReviewsLoading(false);
+      });
+  }, [product?.id]);
+
+  const handleSubmitReview = async () => {
+    if (!session?.user?.id) return;
+    if (!reviewForm.comment.trim()) { setReviewError("يرجى كتابة تعليق"); return; }
+    setReviewSubmitting(true);
+    setReviewError(null);
+    const { error } = await supabase.from("product_reviews").insert({ product_id: product.id, user_id: session.user.id, rating: reviewForm.rating, comment: reviewForm.comment.trim() });
+    if (error) {
+      setReviewError("حدث خطأ، حاول مجدداً");
+    } else {
+      setReviewSuccess(true);
+      setHasReviewed(true);
+      setReviews(prev => [{ user_id: session.user.id, rating: reviewForm.rating, comment: reviewForm.comment.trim(), created_at: new Date().toISOString(), profiles: { full_name: profile?.full_name || "أنت" } }, ...prev]);
+    }
+    setReviewSubmitting(false);
+  };
 
   if (!product) return null;
 
@@ -1346,17 +1392,54 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile }) =
 
         {activeTab === "reviews" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {[{ name: "محمد علي", rating: 5, comment: "قطعة ممتازة وأصلية 100%، البائع متعاون جداً والتوصيل سريع", time: "منذ أسبوع" }, { name: "أحمد كريم", rating: 4, comment: "منتج جيد، التغليف ممتاز. سأشتري مرة ثانية", time: "منذ أسبوعين" }].map((review, i) => (
-              <Card key={i}>
+            {reviews.length > 0 && (
+              <Card>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ fontSize: 36, fontWeight: 900, color: T.gold }}>{(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}</div>
+                  <div>
+                    <Stars rating={Math.round(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length)} size={14} />
+                    <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>{reviews.length} تقييم</div>
+                  </div>
+                </div>
+              </Card>
+            )}
+            {session?.user?.id && !hasReviewed && !reviewSuccess && (
+              <Card>
+                <h4 style={{ margin: "0 0 12px", color: T.textPrimary, fontSize: 14 }}>أضف تقييمك</h4>
+                <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
+                  {[1, 2, 3, 4, 5].map(s => (
+                    <button key={s} onClick={() => setReviewForm(f => ({ ...f, rating: s }))} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, opacity: s <= reviewForm.rating ? 1 : 0.3, padding: 0 }}>⭐</button>
+                  ))}
+                </div>
+                <textarea value={reviewForm.comment} onChange={e => setReviewForm(f => ({ ...f, comment: e.target.value }))} placeholder="اكتب تعليقك هنا..." rows={3} style={{ width: "100%", background: T.navyLight, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 12px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", marginBottom: 10 }} />
+                {reviewError && <p style={{ color: T.red, fontSize: 12, margin: "0 0 8px" }}>{reviewError}</p>}
+                <Btn fullWidth onClick={handleSubmitReview} disabled={reviewSubmitting}>{reviewSubmitting ? "جارٍ الإرسال..." : "إرسال التقييم"}</Btn>
+              </Card>
+            )}
+            {reviewSuccess && (
+              <Card style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+                <p style={{ color: T.green, margin: 0, fontWeight: 700 }}>تم إرسال تقييمك بنجاح!</p>
+              </Card>
+            )}
+            {reviewsLoading ? (
+              <div style={{ textAlign: "center", padding: 20, color: T.textMuted }}>جارٍ التحميل...</div>
+            ) : reviews.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 20 }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>💬</div>
+                <p style={{ color: T.textMuted, margin: 0 }}>لا توجد تقييمات بعد. كن أول من يقيّم!</p>
+              </div>
+            ) : reviews.map((review, i) => (
+              <Card key={review.id || i}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <div style={{ width: 34, height: 34, borderRadius: "50%", background: T.navyLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>👤</div>
                     <div>
-                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{review.name}</div>
+                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{review.profiles?.full_name || "مجهول"}</div>
                       <Stars rating={review.rating} size={11} />
                     </div>
                   </div>
-                  <span style={{ color: T.textMuted, fontSize: 11 }}>{review.time}</span>
+                  <span style={{ color: T.textMuted, fontSize: 11 }}>{relativeTime(review.created_at)}</span>
                 </div>
                 <p style={{ margin: 0, color: T.textSecondary, fontSize: 13, lineHeight: 1.6 }}>{review.comment}</p>
               </Card>
@@ -2565,6 +2648,10 @@ const SellerDashScreen = ({ session, profile }) => {
   const [editAuctionNewPreviews, setEditAuctionNewPreviews] = useState([]);
   const [editAuctionSaving, setEditAuctionSaving] = useState(false);
   const [editAuctionError, setEditAuctionError] = useState(null);
+  const [weeklyChartData, setWeeklyChartData] = useState([]);
+  const [lowStockProducts, setLowStockProducts] = useState([]);
+  const [reportData, setReportData] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
 
   const user = session?.user;
 
@@ -2592,6 +2679,48 @@ const SellerDashScreen = ({ session, profile }) => {
       setCategories(data || []);
     })();
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!sellerInfo?.id) return;
+    const dayNames = ["أحد", "اثن", "ثلث", "أربع", "خمس", "جمعة", "سبت"];
+    supabase.from("seller_weekly_revenue").select("*").eq("seller_id", sellerInfo.id).then(({ data }) => {
+      const today = new Date();
+      const result = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(today);
+        d.setDate(today.getDate() - (6 - i));
+        const dateStr = d.toISOString().split("T")[0];
+        const row = (data || []).find(r => r.day_date === dateStr || r.sale_date === dateStr || r.order_date === dateStr);
+        return { day: dayNames[d.getDay()], amount: Number(row?.total_revenue || row?.revenue || 0) };
+      });
+      const maxAmt = Math.max(...result.map(r => r.amount), 1);
+      const isEmpty = result.every(r => r.amount === 0);
+      setWeeklyChartData(result.map((r, i) => ({
+        ...r,
+        heightPct: isEmpty ? 4 : Math.max(4, Math.round((r.amount / maxAmt) * 100)),
+        isToday: i === 6,
+        isEmpty,
+      })));
+    });
+    supabase.from("products").select("id,name,stock").eq("seller_id", sellerInfo.id).eq("status", "active").lte("stock", 5).order("stock", { ascending: true }).limit(5).then(({ data }) => {
+      setLowStockProducts(data || []);
+    });
+  }, [sellerInfo?.id]);
+
+  useEffect(() => {
+    if (activeTab !== "reports" || !sellerInfo?.id || reportData) return;
+    setReportLoading(true);
+    Promise.all([
+      supabase.from("orders").select("total_amount").eq("seller_id", sellerInfo.id),
+      supabase.from("orders").select("id", { count: "exact", head: true }).eq("seller_id", sellerInfo.id),
+      supabase.from("orders").select("id", { count: "exact", head: true }).eq("seller_id", sellerInfo.id).eq("status", "delivered"),
+      supabase.from("products").select("id", { count: "exact", head: true }).eq("seller_id", sellerInfo.id).eq("status", "active"),
+      supabase.from("seller_top_products").select("*").eq("seller_id", sellerInfo.id).limit(5),
+    ]).then(([{ data: revRows }, { count: orderCount }, { count: deliveredCount }, { count: activeCount }, { data: topProducts }]) => {
+      const totalRevenue = (revRows || []).reduce((s, r) => s + (r.total_amount || 0), 0);
+      setReportData({ totalRevenue, orderCount: orderCount || 0, deliveredCount: deliveredCount || 0, activeCount: activeCount || 0, topProducts: topProducts || [] });
+      setReportLoading(false);
+    });
+  }, [activeTab, sellerInfo?.id]);
 
   const loadProducts = async (sid) => {
     setProductsLoading(true);
@@ -2920,26 +3049,35 @@ const SellerDashScreen = ({ session, profile }) => {
           {/* Revenue Chart */}
           <Card style={{ marginBottom: 16 }}>
             <h4 style={{ margin: "0 0 12px", color: T.textPrimary, fontSize: 14 }}>📈 الإيرادات الأسبوعية</h4>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 80 }}>
-              {[45, 60, 40, 80, 70, 90, 85].map((h, i) => (
-                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                  <div style={{ width: "100%", height: `${h}%`, background: i === 6 ? `linear-gradient(180deg, ${T.gold}, ${T.goldDark})` : `${T.gold}44`, borderRadius: "4px 4px 0 0", transition: "height 0.3s" }} />
-                  <span style={{ color: T.textMuted, fontSize: 9 }}>{"سبعأثخجسأح".split("").filter((_, j) => [0, 2, 4, 6, 8, 10, 12].includes(j * 2))[i] || ["أ", "ث", "ج", "خ", "س", "ج", "س"][i]}</span>
+            {weeklyChartData.length === 0 ? (
+              <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", color: T.textMuted, fontSize: 13 }}>جارٍ التحميل...</div>
+            ) : (
+              <>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 80 }}>
+                  {weeklyChartData.map((d, i) => (
+                    <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <div style={{ width: "100%", height: `${d.heightPct}%`, background: d.isToday ? `linear-gradient(180deg, ${T.gold}, ${T.goldDark})` : `${T.gold}44`, borderRadius: "4px 4px 0 0", transition: "height 0.3s" }} />
+                      <span style={{ color: T.textMuted, fontSize: 9 }}>{d.day}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+                {weeklyChartData[0]?.isEmpty && <p style={{ textAlign: "center", color: T.textMuted, fontSize: 12, margin: "8px 0 0" }}>لا توجد مبيعات هذا الأسبوع بعد</p>}
+              </>
+            )}
           </Card>
 
           {/* Inventory Alerts */}
           <Card>
             <h4 style={{ margin: "0 0 12px", color: T.textPrimary, fontSize: 14 }}>⚠️ تحذيرات المخزون</h4>
-            {[{ name: "فلتر هواء تويوتا", stock: 2, min: 5 }, { name: "زيت Shell 5W-30", stock: 8, min: 10 }].map((item, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i === 0 ? `1px solid ${T.navyBorder}` : "none" }}>
+            {lowStockProducts.length === 0 ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0" }}>
+                <span style={{ fontSize: 18 }}>✅</span>
+                <span style={{ color: T.green, fontSize: 13 }}>جميع المنتجات متوفرة بكميات كافية</span>
+              </div>
+            ) : lowStockProducts.map((item, i) => (
+              <div key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < lowStockProducts.length - 1 ? `1px solid ${T.navyBorder}` : "none" }}>
                 <span style={{ color: T.textSecondary, fontSize: 13 }}>{item.name}</span>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span style={{ color: item.stock < item.min ? T.red : T.green, fontWeight: 700 }}>{item.stock} قطعة</span>
-                  <Btn size="sm" variant="ghost">إضافة</Btn>
-                </div>
+                <span style={{ color: item.stock === 0 ? T.red : T.orange, fontWeight: 700 }}>{item.stock === 0 ? "نفد" : `${item.stock} قطعة`}</span>
               </div>
             ))}
           </Card>
@@ -3122,13 +3260,35 @@ const SellerDashScreen = ({ session, profile }) => {
 
       {activeTab === "reports" && (
         <div>
-          {[["إجمالي المبيعات (الشهر)", "٢,٣٤٠,٠٠٠ د.ع"], ["عدد الطلبات", "١٢٣ طلب"], ["متوسط قيمة الطلب", "١٩,٠٠٠ د.ع"], ["معدل التحويل", "٣.٢%"], ["رضا العملاء", "٩٢%"], ["نمو المبيعات", "+١٨%"]].map(([label, value]) => (
-            <Card key={label} style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: T.textSecondary, fontSize: 13 }}>{label}</span>
-              <span style={{ color: T.gold, fontWeight: 800, fontSize: 15 }}>{value}</span>
-            </Card>
-          ))}
-          <Btn fullWidth variant="secondary" icon="📊">تصدير التقرير</Btn>
+          {reportLoading || !reportData ? (
+            <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>جارٍ التحميل...</div>
+          ) : (
+            <>
+              {[
+                ["إجمالي الإيرادات", `${reportData.totalRevenue.toLocaleString("ar-IQ")} د.ع`],
+                ["إجمالي الطلبات", `${reportData.orderCount.toLocaleString("ar-IQ")} طلب`],
+                ["الطلبات المُسلَّمة", `${reportData.deliveredCount.toLocaleString("ar-IQ")} طلب`],
+                ["المنتجات النشطة", `${reportData.activeCount.toLocaleString("ar-IQ")} منتج`],
+              ].map(([label, value]) => (
+                <Card key={label} style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: T.textSecondary, fontSize: 13 }}>{label}</span>
+                  <span style={{ color: T.gold, fontWeight: 800, fontSize: 15 }}>{value}</span>
+                </Card>
+              ))}
+              {reportData.topProducts.length > 0 && (
+                <Card style={{ marginBottom: 10 }}>
+                  <h4 style={{ margin: "0 0 10px", color: T.textPrimary, fontSize: 14 }}>🏆 أفضل المنتجات</h4>
+                  {reportData.topProducts.map((p, i) => (
+                    <div key={p.product_id || i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: i < reportData.topProducts.length - 1 ? `1px solid ${T.navyBorder}` : "none" }}>
+                      <span style={{ color: T.textSecondary, fontSize: 13 }}>{p.product_name || p.name}</span>
+                      <span style={{ color: T.gold, fontWeight: 700, fontSize: 13 }}>{(p.total_revenue || p.revenue || 0).toLocaleString("ar-IQ")} د.ع</span>
+                    </div>
+                  ))}
+                </Card>
+              )}
+              <Btn fullWidth variant="secondary" icon="📊" disabled style={{ opacity: 0.5 }}>تصدير التقرير (قريباً)</Btn>
+            </>
+          )}
         </div>
       )}
 
