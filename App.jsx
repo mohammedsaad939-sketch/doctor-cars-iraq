@@ -507,6 +507,8 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
   const [publishLoading, setPublishLoading] = useState(false);
   const [publishError, setPublishError] = useState(null);
   const [publishSuccess, setPublishSuccess] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setActiveAuction(p => (p + 1) % MOCK.auctions.length), 5000);
@@ -613,12 +615,29 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
     setShowPublishModal(true);
   };
 
-  const filteredProducts = (() => {
-    let base = MOCK.products;
-    if (cityFilter !== "الكل") base = base.filter(p => p.city === cityFilter);
-    if (searchText) base = base.filter(p => p.name.includes(searchText) || p.category.includes(searchText));
-    return base;
-  })();
+  useEffect(() => {
+    if (!searchText.trim()) { setSearchResults([]); setSearchLoading(false); return; }
+    setSearchLoading(true);
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from("products")
+        .select("*, sellers(store_name), categories(name)")
+        .ilike("name", `%${searchText.trim()}%`)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      setSearchResults((data || []).map(p => ({
+        ...p,
+        image: Array.isArray(p.images) ? (p.images[0] || "📦") : (p.images || "📦"),
+        category: p.categories?.name || "",
+        oldPrice: p.old_price || null,
+        rating: p.rating || 0,
+        reviews: 0,
+      })));
+      setSearchLoading(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchText]);
 
   return (
     <div style={{ padding: "0 0 20px" }}>
@@ -743,14 +762,16 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
         {/* FEATURED PRODUCTS */}
         <Section title="منتجات مميزة" subtitle="أفضل العروض اليوم" action={{ label: "الكل", onClick: () => onNavigate("shop") }}>
           {searchText ? (
-            filteredProducts.length > 0 ? (
+            searchLoading ? (
+              <div style={{ textAlign: "center", padding: 32, color: T.textMuted, fontSize: 13 }}>جاري البحث...</div>
+            ) : searchResults.length > 0 ? (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {filteredProducts.map(p => <ProductCard key={p.id} product={p} onView={onProductView} onCart={onCartAdd} />)}
+                {searchResults.map(p => <ProductCard key={p.id} product={p} onView={onProductView} onCart={onCartAdd} />)}
               </div>
             ) : (
               <Card style={{ textAlign: "center", padding: 32 }}>
                 <div style={{ fontSize: 40, marginBottom: 10 }}>🔍</div>
-                <p style={{ color: T.textSecondary, margin: 0 }}>لم يتم العثور على نتائج لـ "{searchText}"</p>
+                <p style={{ color: T.textSecondary, margin: 0 }}>لا توجد نتائج لـ "{searchText}"</p>
                 <Btn variant="secondary" size="sm" style={{ marginTop: 12 }} onClick={() => onNavigate("request")}>اطلب القطعة</Btn>
               </Card>
             )
