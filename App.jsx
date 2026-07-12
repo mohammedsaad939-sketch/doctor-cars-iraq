@@ -1013,7 +1013,10 @@ const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null }) => {
   }, []);
 
   const categoryTabs = ["الكل", ...shopCategories.map(c => c.name)];
-  const filtered = activeCategory === "الكل" ? products : products.filter(p => p.category === activeCategory);
+  const filtered = products.filter(p =>
+    (activeCategory === "الكل" || p.category === activeCategory) &&
+    p.price >= priceRange[0] && p.price <= priceRange[1]
+  );
 
   return (
     <div style={{ padding: 16 }}>
