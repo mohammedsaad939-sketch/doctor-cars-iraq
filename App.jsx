@@ -708,6 +708,25 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
         </div>
       </div>
 
+      {searchText.length >= 2 && (
+        <div style={{ padding: "0 16px" }}>
+          {searchLoading ? (
+            <div style={{ textAlign: "center", padding: 40, color: T.textMuted, fontSize: 13 }}>جاري البحث...</div>
+          ) : searchResults.length > 0 ? (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, paddingTop: 16 }}>
+              {searchResults.map(p => <ProductCard key={p.id} product={p} onView={onProductView} onCart={onCartAdd} />)}
+            </div>
+          ) : (
+            <Card style={{ textAlign: "center", padding: 32, marginTop: 16 }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>🔍</div>
+              <p style={{ color: T.textSecondary, margin: 0 }}>لا توجد نتائج لـ "{searchText}"</p>
+              <Btn variant="secondary" size="sm" style={{ marginTop: 12 }} onClick={() => onNavigate("request")}>اطلب القطعة</Btn>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {searchText.length < 2 && (
       <div style={{ padding: "0 16px" }}>
         {/* AD CAROUSEL */}
         <AdCarousel onProductView={onProductView} onNavigate={onNavigate} />
@@ -787,21 +806,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
 
         {/* FEATURED PRODUCTS */}
         <Section title="منتجات مميزة" subtitle="أفضل العروض اليوم" action={{ label: "الكل", onClick: () => onNavigate("shop") }}>
-          {searchText ? (
-            searchLoading ? (
-              <div style={{ textAlign: "center", padding: 32, color: T.textMuted, fontSize: 13 }}>جاري البحث...</div>
-            ) : searchResults.length > 0 ? (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {searchResults.map(p => <ProductCard key={p.id} product={p} onView={onProductView} onCart={onCartAdd} />)}
-              </div>
-            ) : (
-              <Card style={{ textAlign: "center", padding: 32 }}>
-                <div style={{ fontSize: 40, marginBottom: 10 }}>🔍</div>
-                <p style={{ color: T.textSecondary, margin: 0 }}>لا توجد نتائج لـ "{searchText}"</p>
-                <Btn variant="secondary" size="sm" style={{ marginTop: 12 }} onClick={() => onNavigate("request")}>اطلب القطعة</Btn>
-              </Card>
-            )
-          ) : featuredLoading ? (
+          {featuredLoading ? (
             <div style={{ textAlign: "center", padding: 32, color: T.textMuted, fontSize: 13 }}>جارٍ التحميل...</div>
           ) : featuredProducts.length === 0 ? (
             <Card style={{ textAlign: "center", padding: 32 }}>
@@ -889,6 +894,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
           </div>
         </Section>
       </div>
+      )}
 
       {/* PUBLISH LISTING MODAL */}
       <Modal isOpen={showPublishModal} onClose={() => !publishLoading && setShowPublishModal(false)} title="نشر بضاعتك 🛍️">
