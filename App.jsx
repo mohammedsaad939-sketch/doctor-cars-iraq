@@ -4010,7 +4010,6 @@ export default function DoctorCarsApp() {
   const [cartBadgeCount, setCartBadgeCount] = useState(0);
   const [cartToast, setCartToast] = useState(null);
   const [prevScreen, setPrevScreen] = useState("home");
-  const [userMode, setUserMode] = useState("buyer"); // buyer | seller | admin
   const [roleDone, setRoleDone] = useState(!!sessionStorage.getItem("role_selected"));
 
   const navigate = (screen) => {
@@ -4126,7 +4125,7 @@ export default function DoctorCarsApp() {
       case "academy": return <AcademyScreen />;
       case "sellerDash": return <SellerDashScreen session={session} profile={profile} />;
       case "myOrders": return <MyOrdersScreen session={session} />;
-      case "admin": return <AdminScreen />;
+      case "admin": return profile?.is_admin ? <AdminScreen /> : <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} profile={profile} session={session} />;
       default: return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} profile={profile} session={session} />;
     }
   };
@@ -4207,16 +4206,6 @@ export default function DoctorCarsApp() {
         </div>
       )}
 
-      {/* ROLE SWITCHER (demo only) */}
-      <div style={{ position: "fixed", top: 12, left: 12, zIndex: 200, display: "flex", flexDirection: "column", gap: 4 }}>
-        {[["B", "buyer", "مشتري"], ["S", "seller", "بائع"], ["A", "admin", "إدارة"]].map(([char, mode, label]) => (
-          <button key={mode} onClick={() => { setUserMode(mode); navigate(mode === "admin" ? "admin" : mode === "seller" ? "sellerDash" : "home"); }}
-            title={label}
-            style={{ width: 32, height: 32, borderRadius: 8, background: userMode === mode ? T.gold : T.navyCard, border: `1px solid ${userMode === mode ? T.gold : T.navyBorder}`, color: userMode === mode ? T.navy : T.textMuted, fontWeight: 800, fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>
-            {char}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
