@@ -141,6 +141,16 @@ const toWhatsAppNumber = (phone) => {
   return "964" + d;
 };
 
+const relativeTime = (iso) => {
+  if (!iso) return "";
+  const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (diff < 60) return "منذ لحظات";
+  if (diff < 3600) return `منذ ${Math.floor(diff / 60)} دقيقة`;
+  if (diff < 86400) return `منذ ${Math.floor(diff / 3600)} ساعة`;
+  if (diff < 172800) return "أمس";
+  return `منذ ${Math.floor(diff / 86400)} يوم`;
+};
+
 const Btn = ({ children, onClick, variant = "primary", size = "md", disabled = false, fullWidth = false, icon = null }) => {
   const styles = {
     primary: { background: `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`, color: T.navy, border: "none" },
@@ -527,7 +537,7 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
 };
 
 // ── HOME SCREEN ──────────────────────────────────────
-const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, session }) => {
+const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCount = 0, profile, session }) => {
   const [searchText, setSearchText] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [activeAuction, setActiveAuction] = useState(0);
@@ -709,7 +719,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, profile, 
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <button onClick={() => onNavigate("notifications")} style={{ position: "relative", background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 12, width: 42, height: 42, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, cursor: "pointer" }}>
               🔔
-              <span style={{ position: "absolute", top: 6, right: 6, width: 8, height: 8, background: T.red, borderRadius: "50%" }} />
+              {notifCount > 0 && <span style={{ position: "absolute", top: 4, right: 4, minWidth: 16, height: 16, background: T.red, color: "#fff", borderRadius: 8, fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{notifCount > 99 ? "99+" : notifCount}</span>}
             </button>
             <button onClick={() => onNavigate("cart")} style={{ position: "relative", background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 12, width: 42, height: 42, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, cursor: "pointer" }}>
               🛒
@@ -3438,33 +3448,86 @@ const AdminScreen = () => {
 };
 
 // ── NOTIFICATIONS SCREEN ──────────────────────────────────────
-const NotificationsScreen = () => {
-  const icons = { order: "📦", auction: "🏆", message: "💬", service: "🔧" };
-  const colors = { order: T.blue, auction: T.gold, message: T.green, service: T.orange };
+const NotificationsScreen = ({ session, onUnreadChange }) => {
+  const typeIcon = { new_bid: "🏆", outbid: "⚠️", auction_won: "🎉", auction_ended: "⏰", order_update: "📦", part_request: "🔧", general: "🔔" };
+  const typeColor = { new_bid: T.gold, outbid: T.orange, auction_won: T.green, auction_ended: T.blue, order_update: T.blue, part_request: T.purple, general: T.textSecondary };
+
+  const [notifs, setNotifs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchNotifs = async () => {
+    if (!session?.user) { setLoading(false); return; }
+    const { data } = await supabase.from("notifications").select("*").eq("user_id", session.user.id).order("created_at", { ascending: false }).limit(20);
+    setNotifs(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchNotifs(); }, [session?.user?.id]);
+
+  const markRead = async (notif) => {
+    if (notif.is_read) return;
+    setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+    await supabase.from("notifications").update({ is_read: true }).eq("id", notif.id);
+    if (onUnreadChange) {
+      const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", session.user.id).eq("is_read", false);
+      onUnreadChange(count || 0);
+    }
+  };
+
+  const markAllRead = async () => {
+    setNotifs(prev => prev.map(n => ({ ...n, is_read: true })));
+    await supabase.from("notifications").update({ is_read: true }).eq("user_id", session.user.id).eq("is_read", false);
+    if (onUnreadChange) onUnreadChange(0);
+  };
+
+  if (!session) {
+    return (
+      <div style={{ padding: 16 }}>
+        <h2 style={{ margin: "0 0 20px", color: T.textPrimary, fontSize: 20, fontWeight: 800 }}>الإشعارات 🔔</h2>
+        <Card style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🔒</div>
+          <p style={{ color: T.textSecondary, margin: 0, fontSize: 14 }}>سجّل دخولك لتلقّي الإشعارات</p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 20, fontWeight: 800 }}>الإشعارات 🔔</h2>
-        <button style={{ background: "none", border: "none", color: T.gold, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>قراءة الكل</button>
+        {notifs.some(n => !n.is_read) && (
+          <button onClick={markAllRead} style={{ background: "none", border: "none", color: T.gold, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>تحديد الكل كمقروء</button>
+        )}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {MOCK.notifications.map(notif => (
-          <Card key={notif.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", opacity: notif.read ? 0.7 : 1, borderRight: `4px solid ${notif.read ? T.navyBorder : colors[notif.type]}` }}>
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: `${colors[notif.type]}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
-              {icons[notif.type]}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 3 }}>
-                <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{notif.title}</span>
-                {!notif.read && <div style={{ width: 8, height: 8, background: T.blue, borderRadius: "50%", flexShrink: 0 }} />}
-              </div>
-              <p style={{ margin: "0 0 4px", color: T.textSecondary, fontSize: 12, lineHeight: 1.5 }}>{notif.body}</p>
-              <span style={{ color: T.textMuted, fontSize: 11 }}>{notif.time}</span>
-            </div>
-          </Card>
-        ))}
-      </div>
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, color: T.textMuted, fontSize: 13 }}>جارٍ التحميل...</div>
+      ) : notifs.length === 0 ? (
+        <Card style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🔔</div>
+          <p style={{ color: T.textSecondary, margin: 0, fontSize: 14 }}>لا توجد إشعارات بعد</p>
+        </Card>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {notifs.map(notif => {
+            const ic = typeIcon[notif.type] || "🔔";
+            const cl = typeColor[notif.type] || T.textSecondary;
+            return (
+              <Card key={notif.id} onClick={() => markRead(notif)} style={{ display: "flex", gap: 12, alignItems: "flex-start", cursor: "pointer", background: notif.is_read ? T.navyCard : `${T.navyCard}`, borderRight: `4px solid ${notif.is_read ? T.navyBorder : cl}`, opacity: notif.is_read ? 0.75 : 1 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: `${cl}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{ic}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 3 }}>
+                    <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{notif.title}</span>
+                    {!notif.is_read && <div style={{ width: 8, height: 8, background: T.blue, borderRadius: "50%", flexShrink: 0, marginTop: 4 }} />}
+                  </div>
+                  <p style={{ margin: "0 0 4px", color: T.textSecondary, fontSize: 12, lineHeight: 1.5 }}>{notif.body}</p>
+                  <span style={{ color: T.textMuted, fontSize: 11 }}>{relativeTime(notif.created_at)}</span>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
@@ -4157,10 +4220,25 @@ export default function DoctorCarsApp() {
     navigate("productDetail");
   };
 
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+
   useEffect(() => {
     if (!session?.user) { setCartBadgeCount(0); return; }
     supabase.from("cart_items").select("id", { count: "exact", head: true }).eq("user_id", session.user.id)
       .then(({ count }) => setCartBadgeCount(count || 0));
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (!session?.user) { setUnreadNotifCount(0); return; }
+    const uid = session.user.id;
+    const fetchUnread = () =>
+      supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", uid).eq("is_read", false)
+        .then(({ count }) => setUnreadNotifCount(count || 0));
+    fetchUnread();
+    const channel = supabase.channel(`notif-${uid}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${uid}` }, fetchUnread)
+      .subscribe();
+    return () => supabase.removeChannel(channel);
   }, [session?.user?.id]);
 
   const handleCartAdd = async (product) => {
@@ -4246,13 +4324,13 @@ export default function DoctorCarsApp() {
 
   const renderScreen = () => {
     switch (currentScreen) {
-      case "home": return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} profile={profile} session={session} />;
+      case "home": return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} notifCount={unreadNotifCount} profile={profile} session={session} />;
       case "shop": return <ShopScreen onProductView={handleProductView} onCartAdd={handleCartAdd} initialCategory={selectedCategory} />;
       case "auctions": return <AuctionsScreen onNavigate={navigate} session={session} />;
       case "garage": return <GarageScreen session={session} />;
       case "profile": return <ProfileScreen onLogout={signOut} onNavigate={navigate} profile={profile} session={session} />;
       case "productDetail": return <ProductDetailScreen product={selectedProduct} onBack={() => navigate(prevScreen)} onCartAdd={handleCartAdd} session={session} profile={profile} />;
-      case "notifications": return <NotificationsScreen />;
+      case "notifications": return <NotificationsScreen session={session} onUnreadChange={setUnreadNotifCount} />;
       case "cart": return <CartScreen session={session} onNavigate={navigate} onCartCountChange={setCartBadgeCount} profile={profile} />;
       case "diagnosis": return <DiagnosisScreen onCartAdd={handleCartAdd} session={session} />;
       case "emergency": return <EmergencyScreen />;
