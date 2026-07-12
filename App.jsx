@@ -1088,7 +1088,7 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile }) =
   useEffect(() => {
     if (!product?.seller_id) return;
     const sid = product.seller_id;
-    supabase.from("sellers").select("store_name, verified, rating, created_at").eq("id", sid).single()
+    supabase.from("sellers").select("store_name, verified, rating, created_at, phone, whatsapp").eq("id", sid).single()
       .then(({ data }) => setSellerInfo(data || null));
     supabase.from("products").select("id", { count: "exact", head: true }).eq("seller_id", sid)
       .then(({ count }) => setSellerProductCount(count || 0));
@@ -1280,9 +1280,9 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile }) =
               ))}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <Btn fullWidth size="sm" icon="💬" variant="ghost">رسالة</Btn>
-              <Btn fullWidth size="sm" icon="📱" variant="ghost">واتساب</Btn>
-              <Btn fullWidth size="sm" icon="📞" variant="ghost">اتصال</Btn>
+              <Btn fullWidth size="sm" icon="💬" variant="ghost" onClick={() => { const num = toWhatsAppNumber(sellerInfo?.whatsapp || sellerInfo?.phone); if (num) window.open(`https://wa.me/${num}?text=${encodeURIComponent(`مرحباً، أنا مهتم بمنتجك: ${product.name}`)}`); }}>رسالة</Btn>
+              <Btn fullWidth size="sm" icon="📱" variant="ghost" onClick={() => { const num = toWhatsAppNumber(sellerInfo?.whatsapp || sellerInfo?.phone); if (num) window.open(`https://wa.me/${num}`); }}>واتساب</Btn>
+              <Btn fullWidth size="sm" icon="📞" variant="ghost" onClick={() => { const ph = sellerInfo?.phone; if (ph) window.open(`tel:${ph}`, "_self"); }}>اتصال</Btn>
             </div>
           </Card>
         )}
