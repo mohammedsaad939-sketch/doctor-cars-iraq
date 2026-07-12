@@ -361,6 +361,23 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState(null);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSubmitting, setForgotSubmitting] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState(null);
+
+  const handleForgot = async () => {
+    if (!forgotEmail.trim()) return;
+    setForgotSubmitting(true);
+    setForgotMsg(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail.trim(), { redirectTo: window.location.origin });
+    if (error) {
+      setForgotMsg({ ok: false, text: error.message });
+    } else {
+      setForgotMsg({ ok: true, text: "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني. تحقق من صندوق الوارد." });
+    }
+    setForgotSubmitting(false);
+  };
 
   const userTypes = [
     { id: "buyer", label: "مشتري", icon: "🛒" },
@@ -402,6 +419,25 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
       </div>
 
       <div style={{ background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 24, padding: 28, width: "100%", maxWidth: 400 }}>
+        {forgotMode ? (
+          <>
+            <h3 style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 17, fontWeight: 800 }}>إعادة تعيين كلمة المرور</h3>
+            <p style={{ margin: "0 0 20px", color: T.textSecondary, fontSize: 13 }}>أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين</p>
+            <Input label="البريد الإلكتروني" value={forgotEmail} onChange={setForgotEmail} placeholder="example@email.com" icon="✉️" type="email" />
+            {forgotMsg && (
+              <div style={{ background: forgotMsg.ok ? `${T.green}1A` : `${T.red}1A`, border: `1px solid ${forgotMsg.ok ? T.green : T.red}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 14, color: forgotMsg.ok ? T.green : T.red, fontSize: 13, lineHeight: 1.6 }}>
+                {forgotMsg.text}
+              </div>
+            )}
+            <Btn onClick={handleForgot} fullWidth size="lg" disabled={forgotSubmitting || !forgotEmail.trim()}>
+              {forgotSubmitting ? "جارٍ الإرسال..." : "إرسال رابط التعيين"}
+            </Btn>
+            <button onClick={() => { setForgotMode(false); setForgotMsg(null); setForgotEmail(""); }} style={{ display: "block", margin: "12px auto 0", background: "none", border: "none", color: T.gold, fontSize: 13, cursor: "pointer" }}>
+              ← رجوع
+            </button>
+          </>
+        ) : (
+        <>
         {/* Mode Toggle */}
         <div style={{ display: "flex", background: T.navyLight, borderRadius: 12, padding: 4, marginBottom: 24 }}>
           {["login", "register"].map(m => (
@@ -461,7 +497,7 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
         </Btn>
 
         {mode === "login" && (
-          <button style={{ display: "block", margin: "12px auto 0", background: "none", border: "none", color: T.gold, fontSize: 13, cursor: "pointer" }}>
+          <button onClick={() => { setForgotMode(true); setForgotMsg(null); setForgotEmail(email); }} style={{ display: "block", margin: "12px auto 0", background: "none", border: "none", color: T.gold, fontSize: 13, cursor: "pointer" }}>
             نسيت كلمة المرور؟
           </button>
         )}
@@ -476,6 +512,8 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
           <Btn variant="ghost" size="sm" icon="📘" fullWidth onClick={() => signInWithOAuth("facebook")}>الدخول بحساب Facebook</Btn>
           <Btn variant="ghost" size="sm" icon="🍎" fullWidth disabled>الدخول بحساب Apple (قريباً)</Btn>
         </div>
+        </>
+        )}
       </div>
 
       <p style={{ color: T.textMuted, fontSize: 11, marginTop: 24, textAlign: "center", lineHeight: 1.6, maxWidth: 320 }}>
