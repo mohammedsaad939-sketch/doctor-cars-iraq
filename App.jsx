@@ -5640,7 +5640,7 @@ export default function DoctorCarsApp() {
   const SCREEN_TITLES = { productDetail: "تفاصيل المنتج", notifications: "الإشعارات", cart: "السلة", diagnosis: "تشخيص الأعطال", emergency: "خدمات الطوارئ", request: "طلب قطعة", academy: "الأكاديمية", sellerDash: "لوحة البائع", admin: "لوحة الإدارة", sellerProfile: "ملف البائع", myOrders: "طلباتي", favorites: "مفضلاتي", myReviews: "مراجعاتي", messages: "رسائلي", addresses: "عناويني", payments: "طرق الدفع", sellerPublic: "ملف المتجر", comparison: "مقارنة المنتجات", priceEstimator: "تقدير السعر" };
 
   return (
-    <div dir="rtl" style={{ fontFamily: "'Cairo', 'Tajawal', 'Segoe UI', sans-serif", background: T.navy, minHeight: "100vh", maxWidth: 480, margin: "0 auto", position: "relative" }}>
+    <div dir="rtl" style={{ fontFamily: "'Cairo', 'Tajawal', 'Segoe UI', sans-serif", background: "#060E1F", minHeight: "100vh", minHeight: "100dvh", maxWidth: 480, margin: "0 auto", position: "relative" }}>
       <style>{`
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 4px; }
