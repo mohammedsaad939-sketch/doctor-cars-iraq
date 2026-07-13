@@ -1704,6 +1704,13 @@ const AuctionsScreen = ({ onNavigate, session }) => {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
   const [createSuccess, setCreateSuccess] = useState(false);
+  const [mySellerId, setMySellerId] = useState(null);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    supabase.from("sellers").select("id").eq("owner_id", session.user.id).single()
+      .then(({ data }) => { if (data) setMySellerId(data.id); });
+  }, [session?.user?.id]);
 
   const handleOpenCreate = async () => {
     if (!user) { setCreateError("يجب تسجيل الدخول أولاً"); setShowCreateModal(true); return; }
@@ -2028,7 +2035,14 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                   if (!user) return (
                     <p style={{ margin: 0, color: T.textMuted, fontSize: 13, fontWeight: 600, textAlign: "center", padding: "10px 0" }}>🔒 سجّل دخولك أولاً للمزايدة</p>
                   );
+                  if (mySellerId && auction.seller_id === mySellerId) return (
+                    <div style={{ background: `${T.gold}18`, border: `1px solid ${T.gold}44`, borderRadius: 10, padding: "12px 14px" }}>
+                      <p style={{ margin: "0 0 8px", color: T.gold, fontWeight: 700, fontSize: 13 }}>📢 أنت صاحب هذا المزاد — لا يمكنك المزايدة على مزادك الخاص. شارك رابط المزاد مع المشترين.</p>
+                      <a href={`https://wa.me/?text=${encodeURIComponent(auction.title + "\n" + window.location.href)}`} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#25D366", color: "#fff", borderRadius: 8, padding: "6px 14px", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>📲 شارك عبر واتساب</a>
+                    </div>
+                  );
                   const bid = bidState[auction.id] || {};
+                  const isOwnAuctionErr = bid.error && (bid.error.includes("البائع") || bid.error.includes("مزاده") || bid.error.includes("مزادك"));
                   return (
                     <div>
                       <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
@@ -2037,7 +2051,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                           placeholder={`أدنى: ${minRequired.toLocaleString("ar-IQ")}`}
                           value={bidAmount[auction.id] || ""}
                           onChange={e => setBidAmount(p => ({ ...p, [auction.id]: e.target.value }))}
-                          style={{ flex: 1, background: T.navyLight, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "10px 14px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, outline: "none" }}
+                          style={{ flex: 1, background: T.navyLight, border: `1px solid ${bid.error ? T.red : T.navyBorder}`, borderRadius: 10, padding: "10px 14px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, outline: "none" }}
                         />
                         <Btn
                           onClick={() => handleBid(auction.id)}
@@ -2048,7 +2062,13 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                           {bid.loading ? "..." : bid.success ? "تم!" : "زايد الآن"}
                         </Btn>
                       </div>
-                      {bid.error && <p style={{ margin: "4px 0 0", color: T.red, fontSize: 12, fontWeight: 600 }}>{bid.error}</p>}
+                      {bid.error && (
+                        <div style={{ background: `${T.red}18`, border: `1px solid ${T.red}55`, borderRadius: 8, padding: "8px 12px", marginTop: 6 }}>
+                          <p style={{ margin: 0, color: T.red, fontSize: 13, fontWeight: 700 }}>
+                            {isOwnAuctionErr ? "لا يمكنك المزايدة على مزادك الخاص" : bid.error}
+                          </p>
+                        </div>
+                      )}
                       {bid.success && <p style={{ margin: "4px 0 0", color: T.green, fontSize: 12, fontWeight: 700 }}>✓ تمت المزايدة بنجاح!</p>}
                     </div>
                   );
@@ -5375,9 +5395,6 @@ const RoleSelectionScreen = ({ session, onComplete }) => {
 // ══════════════════════════════════════════════════════════════
 // MAIN APP
 // ══════════════════════════════════════════════════════════════
-const DARK_COLORS = { navy: "#060E1F", navyMid: "#0A1628", navyCard: "#0F1F3D", navyLight: "#162040", navyBorder: "#1E3A6E", textPrimary: "#E8EAED", textSecondary: "#8B9DC3", textMuted: "#4B6080" };
-const LIGHT_COLORS = { navy: "#F5F7FA", navyMid: "#FFFFFF", navyCard: "#FFFFFF", navyLight: "#F0F2F5", navyBorder: "#D1D5DB", textPrimary: "#111827", textSecondary: "#4B5563", textMuted: "#9CA3AF" };
-
 export default function DoctorCarsApp() {
   const { session, profile, loading, authError, signUp, signIn, signOut, signInWithOAuth } = useAuth();
   const [currentScreen, setCurrentScreen] = useState("home");
@@ -5392,15 +5409,9 @@ export default function DoctorCarsApp() {
   const [selectedSellerId, setSelectedSellerId] = useState(null);
   const [compareList, setCompareList] = useState([]);
   const [showCompareBar, setShowCompareBar] = useState(false);
-  const themeMode = "dark";
   const [lang, setLang] = useState(() => localStorage.getItem("lang") || "ar");
   const [pwaPrompt, setPwaPrompt] = useState(null);
   const [showPwaBanner, setShowPwaBanner] = useState(false);
-
-  useEffect(() => {
-    Object.assign(T, DARK_COLORS);
-    document.documentElement.setAttribute("data-theme", "dark");
-  }, []);
 
   useEffect(() => {
     localStorage.setItem("lang", lang);
