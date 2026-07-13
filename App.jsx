@@ -313,11 +313,14 @@ const AdCarousel = ({ onProductView, onNavigate }) => {
 
 // PRODUCT CARD
 // ═══════════════════════════════════════════════════════
-const ProductCard = ({ product, onView, onCart, isFav, onFavToggle }) => {
+const ProductCard = ({ product, onView, onCart, isFav, onFavToggle, onCompare, inCompare }) => {
   const isDiscounted = product.discount_percent > 0 && (!product.discount_ends_at || new Date(product.discount_ends_at) > new Date());
   const discountedPrice = isDiscounted ? Math.round(product.price * (1 - product.discount_percent / 100) / 100) * 100 : null;
   return (
     <Card style={{ position: "relative" }} onClick={() => onView(product)}>
+      {product.is_promoted && (
+        <div style={{ position: "absolute", top: 12, right: onFavToggle ? 36 : 12, background: `linear-gradient(135deg, ${T.purple}, #6D28D9)`, color: "#fff", borderRadius: 8, padding: "2px 8px", fontSize: 10, fontWeight: 700, zIndex: 2 }}>ممول</div>
+      )}
       {(isDiscounted || product.oldPrice) && (
         <div style={{ position: "absolute", top: 12, left: 12, background: T.red, color: "#fff", borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 700, zIndex: 2 }}>
           {isDiscounted ? `خصم ${product.discount_percent}%` : `-${Math.round((1 - product.price / product.oldPrice) * 100)}%`}
@@ -345,10 +348,18 @@ const ProductCard = ({ product, onView, onCart, isFav, onFavToggle }) => {
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ color: T.textSecondary, fontSize: 11 }}>📍 {product.city}</span>
-        <button onClick={e => { e.stopPropagation(); onCart(product); }} style={{
-          background: `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`, border: "none",
-          borderRadius: 8, padding: "6px 12px", color: T.navy, fontWeight: 700, fontSize: 12, cursor: "pointer"
-        }}>+سلة</button>
+        <div style={{ display: "flex", gap: 4 }}>
+          {onCompare && (
+            <button onClick={e => { e.stopPropagation(); onCompare(product); }} title="قارن" style={{
+              background: inCompare ? `${T.blue}33` : T.navyLight, border: `1px solid ${inCompare ? T.blue : T.navyBorder}`,
+              borderRadius: 8, padding: "6px 8px", color: inCompare ? T.blue : T.textMuted, fontWeight: 700, fontSize: 11, cursor: "pointer"
+            }}>⊕</button>
+          )}
+          <button onClick={e => { e.stopPropagation(); onCart(product); }} style={{
+            background: `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`, border: "none",
+            borderRadius: 8, padding: "6px 12px", color: T.navy, fontWeight: 700, fontSize: 12, cursor: "pointer"
+          }}>+سلة</button>
+        </div>
       </div>
     </Card>
   );
@@ -377,6 +388,7 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [refCode, setRefCode] = useState(() => new URLSearchParams(window.location.search).get("ref") || "");
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState(null);
@@ -416,7 +428,7 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
       const res = await signIn({ email, password });
       if (!res.success) setLocalError(translateAuthError(res.error));
     } else {
-      const res = await signUp({ fullName: name, phone, email, password, role: userType });
+      const res = await signUp({ fullName: name, phone, email, password, role: userType, referredBy: refCode.trim() || null });
       if (!res.success) {
         setLocalError(translateAuthError(res.error));
       } else {
@@ -503,12 +515,15 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
         )}
 
         {mode === "register" && (
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 16 }}>
-            <input type="checkbox" id="agree" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{ marginTop: 3, accentColor: T.gold }} />
-            <label htmlFor="agree" style={{ color: T.textSecondary, fontSize: 13, lineHeight: 1.5, cursor: "pointer" }}>
-              أوافق على <span style={{ color: T.gold }}>شروط الاستخدام</span> و<span style={{ color: T.gold }}>سياسة الخصوصية</span>
-            </label>
-          </div>
+          <>
+            <Input label="كود الإحالة (اختياري)" value={refCode} onChange={setRefCode} placeholder="أدخل كود من صديق..." icon="🎁" />
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 16 }}>
+              <input type="checkbox" id="agree" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{ marginTop: 3, accentColor: T.gold }} />
+              <label htmlFor="agree" style={{ color: T.textSecondary, fontSize: 13, lineHeight: 1.5, cursor: "pointer" }}>
+                أوافق على <span style={{ color: T.gold }}>شروط الاستخدام</span> و<span style={{ color: T.gold }}>سياسة الخصوصية</span>
+              </label>
+            </div>
+          </>
         )}
 
         <Btn onClick={handleSubmit} fullWidth size="lg" disabled={(mode === "register" && !agreed) || submitting}>
@@ -651,7 +666,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
     ]).then(([{ count: products }, { count: sellers }, { count: orders }, { count: auctions }]) => {
       setMarketStats({ products: products || 0, sellers: sellers || 0, orders: orders || 0, auctions: auctions || 0 });
     });
-    supabase.from("sellers").select("id, store_name, specialty, seller_type, phone").limit(4).then(({ data }) => {
+    supabase.from("sellers").select("id, store_name, specialty, seller_type, phone, is_verified").limit(4).then(({ data }) => {
       setTopSellers(data || []);
     });
   }, []);
@@ -943,15 +958,16 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
         <Section title="أفضل البائعين" subtitle="موثقون ومعتمدون">
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {topSellers.map(seller => (
-              <Card key={seller.id} style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <Card key={seller.id} style={{ display: "flex", alignItems: "center", gap: 14 }} onClick={() => onNavigate("sellerPublic", { sellerId: seller.id })}>
                 <div style={{ width: 50, height: 50, borderRadius: 14, background: T.navyLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>🏪</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{seller.store_name || "—"}</span>
+                    {seller.is_verified && <Badge small color={T.green}>✓</Badge>}
                   </div>
                   <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{seller.specialty || seller.seller_type || ""}</div>
                 </div>
-                <button onClick={() => { const num = toWhatsAppNumber(seller.phone); if (num) window.open(`https://wa.me/${num}`); }} style={{ background: `${T.green}22`, border: `1px solid ${T.green}44`, borderRadius: 10, padding: "6px 12px", color: T.green, fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>تواصل</button>
+                <button onClick={e => { e.stopPropagation(); const num = toWhatsAppNumber(seller.phone); if (num) window.open(`https://wa.me/${num}`); }} style={{ background: `${T.green}22`, border: `1px solid ${T.green}44`, borderRadius: 10, padding: "6px 12px", color: T.green, fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>تواصل</button>
               </Card>
             ))}
             {topSellers.length === 0 && <div style={{ textAlign: "center", padding: 20, color: T.textMuted, fontSize: 13 }}>جارٍ التحميل...</div>}
@@ -1062,10 +1078,10 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
 };
 
 // ── SHOP SCREEN ──────────────────────────────────────
-const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null, favSet, onFavToggle }) => {
+const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null, favSet, onFavToggle, onCompare, compareSet }) => {
   const [products, setProducts] = useState(MOCK.products);
   useEffect(() => {
-    supabase.from("products").select("*, sellers(store_name, verified, rating), categories(name)").then(({ data, error }) => {
+    supabase.from("products").select("*, sellers(store_name, verified, is_verified, rating), categories(name)").eq("status", "active").then(({ data, error }) => {
       if (!error && data) {
         setProducts(data.map(p => ({
           id: p.id,
@@ -1075,7 +1091,7 @@ const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null, favSet, 
           oldPrice: p.old_price,
           category: p.categories?.name,
           seller: p.sellers?.store_name,
-          sellerVerified: p.sellers?.verified,
+          sellerVerified: p.sellers?.verified || p.sellers?.is_verified,
           rating: p.sellers?.rating || 0,
           reviews: 0,
           city: p.city,
@@ -1091,6 +1107,7 @@ const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null, favSet, 
           fuel_type: p.fuel_type,
           discount_percent: p.discount_percent || 0,
           discount_ends_at: p.discount_ends_at || null,
+          is_promoted: p.is_promoted || false,
         })));
       }
     });
@@ -1103,6 +1120,8 @@ const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null, favSet, 
   const [shopCategories, setShopCategories] = useState([]);
   const [activeFilters, setActiveFilters] = useState(new Set());
   const [shopToast, setShopToast] = useState(null);
+  const [nearbyCity, setNearbyCity] = useState(null);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
 
   useEffect(() => {
     supabase.from("categories").select("id,name").order("sort_order").then(({ data }) => {
@@ -1110,14 +1129,36 @@ const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null, favSet, 
     });
   }, []);
 
+  const IRAQI_CITIES = { "Baghdad": "بغداد", "Basra": "البصرة", "Erbil": "أربيل", "Najaf": "النجف", "Karbala": "كربلاء", "Mosul": "الموصل" };
+
+  const detectNearby = () => {
+    if (!navigator.geolocation) { setShopToast("الجهاز لا يدعم تحديد الموقع"); setTimeout(() => setShopToast(null), 2500); return; }
+    if (nearbyCity) { setNearbyCity(null); return; }
+    setNearbyLoading(true);
+    navigator.geolocation.getCurrentPosition(async pos => {
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`);
+        const d = await r.json();
+        const city = d.address?.city || d.address?.state || d.address?.county || "";
+        const arCity = IRAQI_CITIES[city] || city || "بغداد";
+        setNearbyCity(arCity);
+      } catch { setNearbyCity("بغداد"); }
+      setNearbyLoading(false);
+    }, () => { setNearbyLoading(false); setShopToast("تعذر تحديد الموقع"); setTimeout(() => setShopToast(null), 2500); });
+  };
+
   const categoryTabs = ["الكل", ...shopCategories.map(c => c.name)];
-  const filtered = products.filter(p =>
+  let filtered = products.filter(p =>
     (activeCategory === "الكل" || p.category === activeCategory) &&
     p.price >= priceRange[0] && p.price <= priceRange[1] &&
     (!activeFilters.has("موثق فقط") || p.sellerVerified) &&
     (!activeFilters.has("جديد") || p.condition === "new") &&
-    (!activeFilters.has("متوفر") || p.stock > 0)
+    (!activeFilters.has("متوفر") || p.stock > 0) &&
+    (!nearbyCity || (p.city && p.city.includes(nearbyCity)))
   );
+  if (sortBy === "promoted") {
+    filtered = [...filtered.filter(p => p.is_promoted), ...filtered.filter(p => !p.is_promoted)];
+  }
 
   return (
     <div style={{ padding: 16 }}>
@@ -1137,13 +1178,19 @@ const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null, favSet, 
 
       {/* Toolbar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <span style={{ color: T.textMuted, fontSize: 13 }}>{filtered.length} منتج</span>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <span style={{ color: T.textMuted, fontSize: 13 }}>{filtered.length} منتج</span>
+          <button onClick={detectNearby} disabled={nearbyLoading} style={{ background: nearbyCity ? `${T.blue}22` : T.navyCard, border: `1px solid ${nearbyCity ? T.blue : T.navyBorder}`, borderRadius: 10, padding: "6px 10px", color: nearbyCity ? T.blue : T.textSecondary, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>
+            {nearbyLoading ? "⏳" : nearbyCity ? `📍 ${nearbyCity}` : "📍 قريب"}
+          </button>
+        </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => setShowFilters(!showFilters)} style={{ background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "8px 14px", color: T.textSecondary, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>
             ⚙️ فلتر
           </button>
           <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, padding: "8px 14px", color: T.textSecondary, fontFamily: "inherit", fontSize: 13, cursor: "pointer", outline: "none" }}>
             <option value="default">ترتيب افتراضي</option>
+            <option value="promoted">الممولة أولاً</option>
             <option value="price_asc">الأقل سعراً</option>
             <option value="price_desc">الأعلى سعراً</option>
             <option value="rating">الأعلى تقييماً</option>
@@ -1177,7 +1224,7 @@ const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null, favSet, 
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        {filtered.map(p => <ProductCard key={p.id} product={p} onView={onProductView} onCart={onCartAdd} isFav={favSet?.has(String(p.id))} onFavToggle={onFavToggle} />)}
+        {filtered.map(p => <ProductCard key={p.id} product={p} onView={onProductView} onCart={onCartAdd} isFav={favSet?.has(String(p.id))} onFavToggle={onFavToggle} onCompare={onCompare} inCompare={compareSet?.has(String(p.id))} />)}
       </div>
     </div>
   );
@@ -1214,7 +1261,7 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile, fav
   useEffect(() => {
     if (!product?.seller_id) return;
     const sid = product.seller_id;
-    supabase.from("sellers").select("store_name, verified, rating, created_at, phone, whatsapp, owner_id").eq("id", sid).single()
+    supabase.from("sellers").select("store_name, verified, is_verified, rating, created_at, phone, whatsapp, owner_id, response_rate, id").eq("id", sid).single()
       .then(({ data }) => setSellerInfo(data || null));
     supabase.from("products").select("id", { count: "exact", head: true }).eq("seller_id", sid)
       .then(({ count }) => setSellerProductCount(count || 0));
@@ -1469,7 +1516,7 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile, fav
               <div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   <span style={{ color: T.textPrimary, fontWeight: 800, fontSize: 15 }}>{sellerInfo?.store_name || product.seller || "—"}</span>
-                  {sellerInfo?.verified && <Badge small color={T.green}>✓ موثق</Badge>}
+                  {(sellerInfo?.verified || sellerInfo?.is_verified) && <Badge small color={T.green}>✓ موثق</Badge>}
                 </div>
                 {sellerInfo?.rating != null && (
                   <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -1479,10 +1526,11 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile, fav
                 )}
               </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
               {[
                 ["المنتجات", sellerProductCount != null ? sellerProductCount.toLocaleString("ar-IQ") : "—"],
                 ["منذ", sellerInfo?.created_at ? new Date(sellerInfo.created_at).getFullYear().toString() : "—"],
+                ["الاستجابة", sellerInfo?.response_rate != null ? `${Math.round(sellerInfo.response_rate)}%` : "—"],
               ].map(([l, v]) => (
                 <div key={l} style={{ textAlign: "center", background: T.navyLight, borderRadius: 10, padding: 10 }}>
                   <div style={{ color: T.gold, fontWeight: 800, fontSize: 16 }}>{v}</div>
@@ -1490,7 +1538,10 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile, fav
                 </div>
               ))}
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Btn fullWidth size="sm" icon="🏬" variant="blue" onClick={() => { if (onNavigate && sellerInfo?.id) { onNavigate("sellerPublic", { sellerId: sellerInfo.id }); } }}>زيارة المتجر</Btn>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <Btn fullWidth size="sm" icon="💬" variant="ghost" onClick={() => { if (!session?.user?.id) return; if (sellerInfo?.owner_id && onMsgContext) { onMsgContext({ partnerId: sellerInfo.owner_id, partnerName: sellerInfo.store_name || "البائع", productId: product.id, productName: product.name }); if (onNavigate) onNavigate("messages"); } }}>راسل البائع</Btn>
               <Btn fullWidth size="sm" icon="📱" variant="ghost" onClick={() => { const num = toWhatsAppNumber(sellerInfo?.whatsapp || sellerInfo?.phone); if (num) window.open(`https://wa.me/${num}`); }}>واتساب</Btn>
               <Btn fullWidth size="sm" icon="📞" variant="ghost" onClick={() => { const ph = sellerInfo?.phone; if (ph) window.open(`tel:${ph}`, "_self"); }}>اتصال</Btn>
@@ -2797,6 +2848,62 @@ const GarageScreen = ({ session }) => {
 };
 
 // ── SELLER DASHBOARD SCREEN ──────────────────────────────────────
+const SellerAnalyticsTab = ({ sellerId }) => {
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!sellerId) return;
+    (async () => {
+      const [{ data: viewsData }, { data: topProds }, { count: totalOrders }] = await Promise.all([
+        supabase.from("seller_product_analytics").select("*").eq("seller_id", sellerId).limit(10),
+        supabase.from("products").select("id,name,stock,price").eq("seller_id", sellerId).eq("status", "active").order("price", { ascending: false }).limit(5),
+        supabase.from("orders").select("id", { count: "exact", head: true }).eq("seller_id", sellerId),
+      ]);
+      setAnalytics({ views: viewsData || [], topProds: topProds || [], totalOrders: totalOrders || 0 });
+      setLoading(false);
+    })();
+  }, [sellerId]);
+
+  if (loading) return <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>جارٍ التحميل...</div>;
+
+  return (
+    <div>
+      <Card style={{ marginBottom: 14, background: `${T.blue}11`, border: `1px solid ${T.blue}33` }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div><div style={{ color: T.textMuted, fontSize: 12 }}>إجمالي الطلبات</div><div style={{ color: T.blue, fontWeight: 900, fontSize: 24 }}>{analytics.totalOrders}</div></div>
+          <span style={{ fontSize: 32 }}>📦</span>
+        </div>
+      </Card>
+      {analytics.views.length > 0 && (
+        <Card style={{ marginBottom: 14 }}>
+          <h4 style={{ margin: "0 0 12px", color: T.textPrimary, fontSize: 14 }}>📊 إحصائيات المنتجات</h4>
+          {analytics.views.map((row, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: i < analytics.views.length - 1 ? `1px solid ${T.navyBorder}` : "none" }}>
+              <span style={{ color: T.textPrimary, fontSize: 13 }}>{row.product_name || row.product_id}</span>
+              <span style={{ color: T.gold, fontWeight: 700, fontSize: 13 }}>{row.view_count || row.views || 0} مشاهدة</span>
+            </div>
+          ))}
+        </Card>
+      )}
+      {analytics.topProds.length > 0 && (
+        <Card>
+          <h4 style={{ margin: "0 0 12px", color: T.textPrimary, fontSize: 14 }}>🏆 أعلى منتجاتك سعراً</h4>
+          {analytics.topProds.map((p, i) => (
+            <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < analytics.topProds.length - 1 ? `1px solid ${T.navyBorder}` : "none" }}>
+              <span style={{ color: T.textPrimary, fontSize: 13 }}>{p.name}</span>
+              <div style={{ textAlign: "left" }}>
+                <div style={{ color: T.gold, fontWeight: 700, fontSize: 13 }}>{p.price?.toLocaleString("ar-IQ")} د.ع</div>
+                <div style={{ color: T.textMuted, fontSize: 11 }}>مخزون: {p.stock}</div>
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+    </div>
+  );
+};
+
 const SellerDashScreen = ({ session, profile }) => {
   const [activeTab, setActiveTab] = useState("overview");
   const [sellerId, setSellerId] = useState(null);
@@ -2845,7 +2952,7 @@ const SellerDashScreen = ({ session, profile }) => {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data: rows } = await supabase.from("sellers").select("id, store_name, verified, rating, seller_type, specialty").eq("owner_id", user.id);
+      const { data: rows } = await supabase.from("sellers").select("id, store_name, verified, rating, seller_type, specialty, is_verified, plan, max_products, response_rate").eq("owner_id", user.id);
       const data = rows?.[0] || null;
       if (data) {
         setSellerId(data.id);
@@ -3194,8 +3301,35 @@ const SellerDashScreen = ({ session, profile }) => {
           <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 18, fontWeight: 800 }}>لوحة البائع 🏪</h2>
           <p style={{ margin: 0, color: T.textSecondary, fontSize: 12 }}>{sellerInfo?.store_name || "..."}</p>
         </div>
-        {sellerInfo?.verified && <Badge color={T.green}>✓ موثق</Badge>}
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          {(sellerInfo?.is_verified || sellerInfo?.verified) ? <Badge color={T.green}>✓ موثق</Badge> : <Badge color={T.orange}>غير موثق</Badge>}
+          {sellerInfo?.plan && <Badge color={sellerInfo.plan === "premium" ? T.gold : sellerInfo.plan === "pro" ? T.blue : T.textMuted}>{sellerInfo.plan}</Badge>}
+        </div>
       </div>
+      {!(sellerInfo?.is_verified || sellerInfo?.verified) && sellerInfo && (
+        <Card style={{ marginBottom: 16, background: `${T.orange}11`, border: `1px solid ${T.orange}44` }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <span style={{ fontSize: 24 }}>🔖</span>
+            <div>
+              <div style={{ color: T.orange, fontWeight: 700, fontSize: 13 }}>متجرك غير موثق بعد</div>
+              <div style={{ color: T.textMuted, fontSize: 12 }}>تواصل مع الإدارة عبر الدعم لتوثيق متجرك والحصول على شارة التحقق</div>
+            </div>
+          </div>
+        </Card>
+      )}
+      {sellerInfo?.max_products && (
+        <Card style={{ marginBottom: 16, background: `${T.blue}11`, border: `1px solid ${T.blue}33` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ color: T.textSecondary, fontSize: 12 }}>المنتجات المستخدمة</div>
+              <div style={{ color: products.length >= sellerInfo.max_products ? T.red : T.blue, fontWeight: 800, fontSize: 16 }}>{products.length} / {sellerInfo.max_products}</div>
+            </div>
+            {products.length >= sellerInfo.max_products && (
+              <button onClick={() => { const n = toWhatsAppNumber("07700000000"); if (n) window.open(`https://wa.me/${n}?text=${encodeURIComponent("أريد ترقية اشتراكي في دكتور السيارات")}`); }} style={{ background: `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`, border: "none", borderRadius: 10, padding: "8px 14px", color: T.navy, fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>ترقية الخطة ⬆️</button>
+            )}
+          </div>
+        </Card>
+      )}
 
       {saveSuccessMsg && (
         <div style={{ background: `${T.green}22`, border: `1px solid ${T.green}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 12, color: T.green, fontSize: 13, fontWeight: 700 }}>
@@ -3231,6 +3365,7 @@ const SellerDashScreen = ({ session, profile }) => {
           { id: "products", label: "المنتجات" },
           ...(sellerInfo?.seller_type === "wholesale" || profile?.role === "trader" ? [{ id: "warehouse", label: "مستودعي" }] : []),
           { id: "auctions", label: "مزاداتي" },
+          { id: "analytics", label: "إحصائيات" },
           { id: "reports", label: "التقارير" },
         ]}
         active={activeTab} onChange={setActiveTab}
@@ -3344,9 +3479,13 @@ const SellerDashScreen = ({ session, profile }) => {
                   </div>
                   <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{p.name}</p>
                   <p style={{ margin: "0 0 8px", color: T.gold, fontSize: 13, fontWeight: 800 }}>{Number(p.price).toLocaleString("ar-IQ")} د.ع</p>
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     <Btn size="sm" variant="ghost" fullWidth onClick={() => handleEdit(p)}>تعديل</Btn>
                     <Btn size="sm" variant="danger" onClick={() => handleDelete(p.id)}>🗑️</Btn>
+                    <Btn size="sm" variant={p.is_promoted ? "secondary" : "ghost"} fullWidth onClick={async () => {
+                      await supabase.from("products").update({ is_promoted: !p.is_promoted }).eq("id", p.id);
+                      setProducts(prev => prev.map(pp => pp.id === p.id ? { ...pp, is_promoted: !pp.is_promoted } : pp));
+                    }}>{p.is_promoted ? "⭐ ممول" : "روّج"}</Btn>
                   </div>
                 </Card>
               ))}
@@ -3450,12 +3589,16 @@ const SellerDashScreen = ({ session, profile }) => {
         </div>
       )}
 
+      {activeTab === "analytics" && (
+        <SellerAnalyticsTab sellerId={sellerId} />
+      )}
+
       {activeTab === "reports" && (
         <div>
           {reportLoading || !reportData ? (
             <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>جارٍ التحميل...</div>
           ) : (
-            <>
+<>
               {[
                 ["إجمالي الإيرادات", `${reportData.totalRevenue.toLocaleString("ar-IQ")} د.ع`],
                 ["إجمالي الطلبات", `${reportData.orderCount.toLocaleString("ar-IQ")} طلب`],
@@ -3650,6 +3793,222 @@ const SellerDashScreen = ({ session, profile }) => {
   );
 };
 
+// ── SELLER PUBLIC SCREEN ──────────────────────────────────────
+const SellerPublicScreen = ({ sellerId, onProductView, onCartAdd, session, onNavigate, favSet, onFavToggle }) => {
+  const [seller, setSeller] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [responseRate, setResponseRate] = useState(null);
+
+  useEffect(() => {
+    if (!sellerId) return;
+    (async () => {
+      const [{ data: s }, { data: prods }] = await Promise.all([
+        supabase.from("sellers").select("id, store_name, verified, is_verified, rating, seller_type, specialty, phone, whatsapp, created_at, owner_id, response_rate").eq("id", sellerId).single(),
+        supabase.from("products").select("*, categories(name)").eq("seller_id", sellerId).eq("status", "active").order("created_at", { ascending: false }),
+      ]);
+      setSeller(s);
+      setProducts((prods || []).map(p => ({ ...p, image: Array.isArray(p.images) ? (p.images[0] || "📦") : (p.images || "📦"), category: p.categories?.name || "", oldPrice: p.old_price || null, rating: p.rating || 0, reviews: 0, discount_percent: p.discount_percent || 0, discount_ends_at: p.discount_ends_at || null })));
+      if (s?.response_rate != null) {
+        setResponseRate(s.response_rate);
+      } else if (s?.owner_id) {
+        const { data: msgs } = await supabase.from("messages").select("id, is_read").eq("receiver_id", s.owner_id).limit(100);
+        if (msgs && msgs.length > 0) {
+          const replied = msgs.filter(m => m.is_read).length;
+          setResponseRate(Math.round((replied / msgs.length) * 100));
+        }
+      }
+      if (s?.id) supabase.from("product_views").insert({ seller_id: s.id, viewed_at: new Date().toISOString() }).then(() => {});
+      setLoading(false);
+    })();
+  }, [sellerId]);
+
+  if (loading) return <div style={{ padding: 40, textAlign: "center", color: T.textMuted }}>جارٍ التحميل...</div>;
+  if (!seller) return <div style={{ padding: 40, textAlign: "center", color: T.textMuted }}>البائع غير موجود</div>;
+
+  return (
+    <div style={{ padding: 16 }}>
+      <Card style={{ textAlign: "center", marginBottom: 20, background: `linear-gradient(135deg, ${T.navyLight}, ${T.navyCard})` }}>
+        <div style={{ width: 70, height: 70, borderRadius: 20, background: T.navyMid, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, margin: "0 auto 12px" }}>🏪</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 6 }}>
+          <h3 style={{ margin: 0, color: T.textPrimary, fontSize: 18, fontWeight: 900 }}>{seller.store_name}</h3>
+          {(seller.verified || seller.is_verified) && <Badge color={T.green}>✓ موثق</Badge>}
+        </div>
+        <p style={{ margin: "0 0 10px", color: T.textSecondary, fontSize: 13 }}>{seller.specialty || seller.seller_type || ""}</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          {[
+            [seller.rating?.toFixed(1) || "—", "التقييم"],
+            [products.length.toLocaleString("ar-IQ"), "المنتجات"],
+            [responseRate != null ? `${responseRate}%` : "—", "الاستجابة"],
+          ].map(([v, l]) => (
+            <div key={l} style={{ background: T.navyMid, borderRadius: 10, padding: 10 }}>
+              <div style={{ color: T.gold, fontWeight: 900, fontSize: 16 }}>{v}</div>
+              <div style={{ color: T.textMuted, fontSize: 10 }}>{l}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "center" }}>
+          {seller.whatsapp || seller.phone ? <Btn size="sm" variant="green" icon="📱" onClick={() => { const n = toWhatsAppNumber(seller.whatsapp || seller.phone); if (n) window.open(`https://wa.me/${n}`); }}>واتساب</Btn> : null}
+          {seller.phone ? <Btn size="sm" variant="ghost" icon="📞" onClick={() => window.open(`tel:${seller.phone}`, "_self")}>اتصال</Btn> : null}
+          {session?.user && seller.owner_id ? <Btn size="sm" variant="ghost" icon="💬" onClick={() => { if (onNavigate) onNavigate("messages"); }}>رسالة</Btn> : null}
+        </div>
+      </Card>
+      <h4 style={{ margin: "0 0 12px", color: T.textPrimary, fontSize: 15, fontWeight: 800 }}>منتجات المتجر ({products.length})</h4>
+      {products.length === 0 ? (
+        <Card style={{ textAlign: "center", padding: 32 }}><div style={{ fontSize: 40, marginBottom: 10 }}>📦</div><p style={{ color: T.textMuted, margin: 0 }}>لا توجد منتجات منشورة</p></Card>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {products.map(p => <ProductCard key={p.id} product={p} onView={onProductView} onCart={onCartAdd} isFav={favSet?.has(String(p.id))} onFavToggle={onFavToggle} />)}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── CAR PRICE ESTIMATOR SCREEN ──────────────────────────────────────
+const CarPriceEstimatorScreen = ({ session, onCartAdd, onProductView }) => {
+  const [brand, setBrand] = useState("");
+  const [model, setModel] = useState("");
+  const [year, setYear] = useState("");
+  const [mileage, setMileage] = useState("");
+  const [condition, setCondition] = useState("good");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [similarProducts, setSimilarProducts] = useState([]);
+
+  const CONDITIONS = { excellent: 1.15, good: 1.0, fair: 0.82, poor: 0.65 };
+  const CONDITION_LABELS = { excellent: "ممتازة", good: "جيدة", fair: "مقبولة", poor: "ضعيفة" };
+
+  const estimate = async () => {
+    if (!brand.trim() || !model.trim() || !year) return;
+    setLoading(true);
+    setResult(null);
+    const { data } = await supabase.from("products").select("price, name").ilike("name", `%${brand.trim()}%`).eq("status", "active").limit(50);
+    const prices = (data || []).map(p => p.price).filter(p => p > 0);
+    if (prices.length < 2) {
+      setResult({ min: 8000000, max: 25000000, avg: 15000000, factor: CONDITIONS[condition], count: 0 });
+    } else {
+      const sorted = [...prices].sort((a, b) => a - b);
+      const f = CONDITIONS[condition];
+      setResult({ min: Math.round(sorted[0] * f), max: Math.round(sorted[sorted.length - 1] * f), avg: Math.round((prices.reduce((s, p) => s + p, 0) / prices.length) * f), factor: f, count: prices.length });
+    }
+    setSimilarProducts((data || []).slice(0, 4));
+    if (session?.user?.id) {
+      supabase.from("car_price_estimates").insert({ user_id: session.user.id, brand: brand.trim(), model: model.trim(), year: parseInt(year), mileage: mileage ? parseInt(mileage) : null, condition, estimated_min: result?.min, estimated_max: result?.max }).then(() => {});
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ padding: 16 }}>
+      <h2 style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 20, fontWeight: 800 }}>🚗 تقدير سعر السيارة</h2>
+      <p style={{ margin: "0 0 20px", color: T.textSecondary, fontSize: 13 }}>احصل على تقدير لقيمة سيارتك في السوق العراقي</p>
+      <Card>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Input label="الماركة *" value={brand} onChange={setBrand} placeholder="Toyota" />
+          <Input label="الموديل *" value={model} onChange={setModel} placeholder="Camry" />
+          <Input label="سنة الصنع *" type="number" value={year} onChange={setYear} placeholder="2019" />
+          <Input label="المسافة (كم)" type="number" value={mileage} onChange={setMileage} placeholder="85000" />
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 8, fontWeight: 600 }}>حالة السيارة</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            {Object.entries(CONDITION_LABELS).map(([k, v]) => (
+              <button key={k} onClick={() => setCondition(k)} style={{ flex: 1, padding: "8px 4px", borderRadius: 10, border: `2px solid ${condition === k ? T.gold : T.navyBorder}`, background: condition === k ? `${T.gold}15` : "transparent", color: condition === k ? T.gold : T.textSecondary, fontFamily: "inherit", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>{v}</button>
+            ))}
+          </div>
+        </div>
+        <Btn fullWidth onClick={estimate} disabled={!brand.trim() || !model.trim() || !year || loading}>{loading ? "جارٍ التقدير..." : "احسب القيمة"}</Btn>
+      </Card>
+      {result && (
+        <Card style={{ marginTop: 16, background: `linear-gradient(135deg, ${T.navyLight}, ${T.navyCard})`, border: `1px solid ${T.gold}44` }}>
+          <h4 style={{ margin: "0 0 14px", color: T.gold, fontSize: 15, fontWeight: 800 }}>نتيجة التقدير</h4>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+            {[["الحد الأدنى", result.min], ["المتوسط", result.avg], ["الحد الأعلى", result.max]].map(([l, v]) => (
+              <div key={l} style={{ textAlign: "center", background: T.navyMid, borderRadius: 10, padding: 10 }}>
+                <div style={{ color: T.gold, fontWeight: 900, fontSize: 13 }}>{v.toLocaleString("ar-IQ")}</div>
+                <div style={{ color: T.textMuted, fontSize: 10 }}>د.ع</div>
+                <div style={{ color: T.textSecondary, fontSize: 10 }}>{l}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 12 }}>
+            بناءً على {result.count} منتج مشابه · معامل الحالة: ×{result.factor}
+          </div>
+          <Btn fullWidth variant="primary" icon="📋" onClick={() => {}} size="sm">اعرض سيارتك للبيع</Btn>
+        </Card>
+      )}
+      {similarProducts.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <h4 style={{ margin: "0 0 10px", color: T.textPrimary, fontSize: 14, fontWeight: 800 }}>منتجات مشابهة</h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {similarProducts.map(p => (
+              <Card key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: T.textPrimary, fontSize: 13, flex: 1 }}>{p.name}</span>
+                <span style={{ color: T.gold, fontWeight: 800, fontSize: 13 }}>{p.price?.toLocaleString("ar-IQ")} د.ع</span>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── COMPARISON SCREEN ──────────────────────────────────────
+const ComparisonScreen = ({ compareList, onClear, onRemove, onCartAdd }) => {
+  if (compareList.length === 0) return (
+    <div style={{ padding: 40, textAlign: "center" }}>
+      <div style={{ fontSize: 48, marginBottom: 12 }}>⊕</div>
+      <p style={{ color: T.textMuted, margin: 0 }}>لم تختر منتجات للمقارنة بعد</p>
+    </div>
+  );
+
+  const attrs = ["name", "price", "category", "city", "condition", "stock"];
+  const attrLabels = { name: "الاسم", price: "السعر", category: "الفئة", city: "المدينة", condition: "الحالة", stock: "المخزون" };
+
+  return (
+    <div style={{ padding: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 18, fontWeight: 800 }}>⊕ مقارنة المنتجات</h2>
+        <Btn size="sm" variant="danger" onClick={onClear}>مسح الكل</Btn>
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 360 }}>
+          <thead>
+            <tr>
+              <th style={{ padding: "8px 10px", color: T.textMuted, fontSize: 12, textAlign: "right", background: T.navyLight, borderRadius: "8px 0 0 8px", width: 80 }}>الخاصية</th>
+              {compareList.map(p => (
+                <th key={p.id} style={{ padding: "8px 10px", color: T.textPrimary, fontSize: 12, background: T.navyLight, textAlign: "center", minWidth: 120 }}>
+                  <div style={{ marginBottom: 4 }}>{typeof p.image === "string" && p.image.startsWith("http") ? <img src={p.image} alt="" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 8 }} /> : <span style={{ fontSize: 24 }}>{p.image || "📦"}</span>}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: T.textPrimary }}>{p.name?.substring(0, 20)}</div>
+                  <button onClick={() => onRemove(p.id)} style={{ background: `${T.red}22`, border: "none", borderRadius: 6, padding: "2px 6px", color: T.red, fontSize: 10, cursor: "pointer", marginTop: 4 }}>✕ إزالة</button>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {attrs.map((attr, i) => (
+              <tr key={attr} style={{ background: i % 2 === 0 ? T.navyCard : T.navyMid }}>
+                <td style={{ padding: "10px 10px", color: T.textMuted, fontSize: 12, fontWeight: 700 }}>{attrLabels[attr]}</td>
+                {compareList.map(p => {
+                  const val = attr === "price" ? `${p.price?.toLocaleString("ar-IQ")} د.ع` : String(p[attr] || "—");
+                  const isMin = attr === "price" && compareList.every(pp => pp.price >= p.price);
+                  return <td key={p.id} style={{ padding: "10px 10px", color: isMin ? T.green : T.textPrimary, fontWeight: isMin ? 800 : 400, fontSize: 13, textAlign: "center" }}>{val}</td>;
+                })}
+              </tr>
+            ))}
+            <tr>
+              <td style={{ padding: "10px 10px" }}></td>
+              {compareList.map(p => <td key={p.id} style={{ padding: "10px 10px", textAlign: "center" }}><button onClick={() => onCartAdd(p)} style={{ background: `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`, border: "none", borderRadius: 8, padding: "6px 12px", color: T.navy, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>+سلة</button></td>)}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 // ── ADMIN DASHBOARD SCREEN ──────────────────────────────────────
 const AdminScreen = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -3659,6 +4018,13 @@ const AdminScreen = () => {
   const [adminUpdateMsg, setAdminUpdateMsg] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(null);
   const [openRequestsCount, setOpenRequestsCount] = useState(null);
+  const [pendingSellers, setPendingSellers] = useState([]);
+  const [sellersLoading, setSellersLoading] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState("");
+  const [promotedProducts, setPromotedProducts] = useState([]);
+  const [promotedLoading, setPromotedLoading] = useState(false);
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [subscriptionsLoading, setSubscriptionsLoading] = useState(false);
 
   useEffect(() => {
     if (activeTab !== "users" || users.length > 0) return;
@@ -3672,6 +4038,39 @@ const AdminScreen = () => {
     supabase.from("part_requests").select("id", { count: "exact", head: true }).eq("status", "open")
       .then(({ count }) => setOpenRequestsCount(count || 0));
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "verification" || pendingSellers.length > 0) return;
+    setSellersLoading(true);
+    supabase.from("sellers").select("id, store_name, seller_type, created_at, is_verified, verified").order("created_at", { ascending: false }).limit(50)
+      .then(({ data }) => { setPendingSellers(data || []); setSellersLoading(false); });
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "promotions" || promotedProducts.length > 0) return;
+    setPromotedLoading(true);
+    supabase.from("products").select("id, name, is_promoted, seller_id, sellers(store_name)").order("created_at", { ascending: false }).limit(50)
+      .then(({ data }) => { setPromotedProducts(data || []); setPromotedLoading(false); });
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "subscriptions" || subscriptions.length > 0) return;
+    setSubscriptionsLoading(true);
+    supabase.from("sellers").select("id, store_name, plan, max_products, seller_type").order("created_at", { ascending: false }).limit(50)
+      .then(({ data }) => { setSubscriptions(data || []); setSubscriptionsLoading(false); });
+  }, [activeTab]);
+
+  const handleVerifySeller = async (sellerId, approve) => {
+    await supabase.from("sellers").update({ is_verified: approve, verified: approve }).eq("id", sellerId);
+    setPendingSellers(prev => prev.map(s => s.id === sellerId ? { ...s, is_verified: approve, verified: approve } : s));
+    setVerifyMsg(approve ? "تم توثيق البائع ✓" : "تم رفض التوثيق");
+    setTimeout(() => setVerifyMsg(""), 3000);
+  };
+
+  const handleTogglePromoted = async (productId, current) => {
+    await supabase.from("products").update({ is_promoted: !current }).eq("id", productId);
+    setPromotedProducts(prev => prev.map(p => p.id === productId ? { ...p, is_promoted: !current } : p));
+  };
 
   const handleAdminToggle = async (userId, makeAdmin) => {
     setShowUserMenu(null);
@@ -3712,7 +4111,7 @@ const AdminScreen = () => {
       </div>
 
       <Tabs
-        tabs={[{ id: "overview", label: "نظرة عامة" }, { id: "users", label: "المستخدمون" }, { id: "violations", label: "المخالفات" }, { id: "finance", label: "المالية" }]}
+        tabs={[{ id: "overview", label: "نظرة عامة" }, { id: "users", label: "المستخدمون" }, { id: "verification", label: "التوثيق" }, { id: "promotions", label: "المنشورات" }, { id: "subscriptions", label: "الاشتراكات" }, { id: "violations", label: "المخالفات" }, { id: "finance", label: "المالية" }]}
         active={activeTab} onChange={setActiveTab}
       />
 
@@ -3793,6 +4192,81 @@ const AdminScreen = () => {
               )}
             </Card>
           ))}
+        </div>
+      )}
+
+      {activeTab === "verification" && (
+        <div>
+          {verifyMsg && <div style={{ background: `${T.green}22`, border: `1px solid ${T.green}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 12, color: T.green, fontSize: 13, fontWeight: 700 }}>{verifyMsg}</div>}
+          {sellersLoading ? <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>جارٍ التحميل...</div> : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {pendingSellers.map(s => (
+                <Card key={s.id}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{s.store_name}</div>
+                      <div style={{ color: T.textMuted, fontSize: 11 }}>{s.seller_type} · {new Date(s.created_at).toLocaleDateString("ar-IQ")}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {(s.is_verified || s.verified) ? <Badge color={T.green}>موثق ✓</Badge> : <Badge color={T.orange}>معلق</Badge>}
+                      {!(s.is_verified || s.verified) && <Btn size="sm" variant="green" onClick={() => handleVerifySeller(s.id, true)}>قبول</Btn>}
+                      {(s.is_verified || s.verified) && <Btn size="sm" variant="danger" onClick={() => handleVerifySeller(s.id, false)}>إلغاء</Btn>}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+              {pendingSellers.length === 0 && <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>لا توجد طلبات توثيق</div>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "promotions" && (
+        <div>
+          {promotedLoading ? <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>جارٍ التحميل...</div> : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {promotedProducts.map(p => (
+                <Card key={p.id}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{p.name}</div>
+                      <div style={{ color: T.textMuted, fontSize: 11 }}>{p.sellers?.store_name || "—"}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {p.is_promoted ? <Badge color={T.purple}>ممول</Badge> : <Badge color={T.textMuted}>عادي</Badge>}
+                      <Btn size="sm" variant={p.is_promoted ? "danger" : "ghost"} onClick={() => handleTogglePromoted(p.id, p.is_promoted)}>
+                        {p.is_promoted ? "إلغاء التمويل" : "روّج"}
+                      </Btn>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+              {promotedProducts.length === 0 && <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>لا توجد منتجات</div>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "subscriptions" && (
+        <div>
+          {subscriptionsLoading ? <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>جارٍ التحميل...</div> : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {subscriptions.map(s => (
+                <Card key={s.id}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{s.store_name}</div>
+                      <div style={{ color: T.textMuted, fontSize: 11 }}>حد المنتجات: {s.max_products || "غير محدود"}</div>
+                    </div>
+                    <Badge color={s.plan === "premium" ? T.gold : s.plan === "pro" ? T.blue : T.textMuted}>
+                      {s.plan || "مجاني"}
+                    </Badge>
+                  </div>
+                </Card>
+              ))}
+              {subscriptions.length === 0 && <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>لا توجد اشتراكات</div>}
+            </div>
+          )}
         </div>
       )}
 
@@ -4257,6 +4731,37 @@ const AcademyScreen = () => {
 };
 
 // ── MY ORDERS SCREEN ──────────────────────────────────────
+const ORDER_STEPS = [
+  { key: "pending", label: "استلام الطلب", icon: "📋" },
+  { key: "confirmed", label: "تم التأكيد", icon: "✅" },
+  { key: "shipped", label: "في الطريق", icon: "🚚" },
+  { key: "delivered", label: "تم التسليم", icon: "📦" },
+];
+
+const OrderStepper = ({ status }) => {
+  const stepKeys = ORDER_STEPS.map(s => s.key);
+  const currentIdx = status === "cancelled" ? -1 : stepKeys.indexOf(status);
+  return (
+    <div style={{ display: "flex", alignItems: "center", margin: "12px 0 6px", gap: 0 }}>
+      {ORDER_STEPS.map((step, i) => {
+        const done = currentIdx >= i && currentIdx !== -1;
+        const active = currentIdx === i && currentIdx !== -1;
+        return (
+          <div key={step.key} style={{ display: "flex", alignItems: "center", flex: 1 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 44 }}>
+              <div style={{ width: 32, height: 32, borderRadius: "50%", background: done ? T.green : T.navyLight, border: `2px solid ${done ? T.green : active ? T.gold : T.navyBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, transition: "all 0.3s" }}>
+                {done ? "✓" : step.icon}
+              </div>
+              <div style={{ color: done ? T.green : T.textMuted, fontSize: 9, marginTop: 3, textAlign: "center", whiteSpace: "nowrap" }}>{step.label}</div>
+            </div>
+            {i < ORDER_STEPS.length - 1 && <div style={{ flex: 1, height: 2, background: done && currentIdx > i ? T.green : T.navyBorder, margin: "0 2px", marginBottom: 14, transition: "all 0.3s" }} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const MyOrdersScreen = ({ session }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -4300,8 +4805,9 @@ const MyOrdersScreen = ({ session }) => {
                   <span style={{ color: T.textMuted, fontSize: 12 }}>{date}</span>
                   <Badge color={status.color}>{status.label}</Badge>
                 </div>
-                <p style={{ margin: "0 0 6px", color: T.textPrimary, fontSize: 14, fontWeight: 700 }}>{itemNames}</p>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 14, fontWeight: 700 }}>{itemNames}</p>
+                {order.status !== "cancelled" && <OrderStepper status={order.status} />}
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
                   <span style={{ color: T.textMuted, fontSize: 12 }}>الكمية: {order.order_items?.reduce((s, i) => s + i.quantity, 0) || 0}</span>
                   <span style={{ color: T.gold, fontWeight: 800 }}>{order.total_amount?.toLocaleString("ar-IQ")} د.ع</span>
                 </div>
@@ -4625,6 +5131,17 @@ const ProfileScreen = ({ onLogout, onNavigate, profile, session }) => {
             </div>
           ))}
         </div>
+        {profile?.referral_code && (
+          <div style={{ marginTop: 14, background: T.navyMid, borderRadius: 12, padding: "10px 14px", border: `1px solid ${T.gold}44` }}>
+            <div style={{ color: T.textMuted, fontSize: 11, marginBottom: 4 }}>كود الإحالة الخاص بك</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ color: T.gold, fontWeight: 900, fontSize: 16, letterSpacing: 2 }}>{profile.referral_code}</span>
+              <button onClick={() => navigator.clipboard?.writeText(profile.referral_code)} style={{ background: `${T.gold}22`, border: `1px solid ${T.gold}44`, borderRadius: 8, padding: "4px 10px", color: T.gold, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>نسخ</button>
+              <button onClick={() => { const msg = `انضم لدكتور السيارات! كود الإحالة: ${profile.referral_code}`; window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`); }} style={{ background: `${T.green}22`, border: `1px solid ${T.green}44`, borderRadius: 8, padding: "4px 10px", color: T.green, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>مشاركة</button>
+            </div>
+            {profile.referral_points > 0 && <div style={{ color: T.purple, fontSize: 12, marginTop: 6 }}>⭐ نقاطك: {profile.referral_points}</div>}
+          </div>
+        )}
       </Card>
 
       {/* Menu Items */}
@@ -4849,6 +5366,9 @@ const RoleSelectionScreen = ({ session, onComplete }) => {
 // ══════════════════════════════════════════════════════════════
 // MAIN APP
 // ══════════════════════════════════════════════════════════════
+const DARK_COLORS = { navy: "#060E1F", navyMid: "#0A1628", navyCard: "#0F1F3D", navyLight: "#162040", navyBorder: "#1E3A6E", textPrimary: "#E8EAED", textSecondary: "#8B9DC3", textMuted: "#4B6080" };
+const LIGHT_COLORS = { navy: "#F5F7FA", navyMid: "#FFFFFF", navyCard: "#FFFFFF", navyLight: "#F0F2F5", navyBorder: "#D1D5DB", textPrimary: "#111827", textSecondary: "#4B5563", textMuted: "#9CA3AF" };
+
 export default function DoctorCarsApp() {
   const { session, profile, loading, authError, signUp, signIn, signOut, signInWithOAuth } = useAuth();
   const [currentScreen, setCurrentScreen] = useState("home");
@@ -4860,11 +5380,52 @@ export default function DoctorCarsApp() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [favSet, setFavSet] = useState(new Set());
   const [msgContext, setMsgContext] = useState(null);
+  const [selectedSellerId, setSelectedSellerId] = useState(null);
+  const [compareList, setCompareList] = useState([]);
+  const [showCompareBar, setShowCompareBar] = useState(false);
+  const [themeMode, setThemeMode] = useState(() => localStorage.getItem("theme") || (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"));
+  const [lang, setLang] = useState(() => localStorage.getItem("lang") || "ar");
+  const [pwaPrompt, setPwaPrompt] = useState(null);
+  const [showPwaBanner, setShowPwaBanner] = useState(false);
+
+  useEffect(() => {
+    Object.assign(T, themeMode === "light" ? LIGHT_COLORS : DARK_COLORS);
+    localStorage.setItem("theme", themeMode);
+    document.documentElement.setAttribute("data-theme", themeMode);
+  }, [themeMode]);
+
+  useEffect(() => {
+    localStorage.setItem("lang", lang);
+    document.documentElement.lang = lang === "en" ? "en" : "ar";
+    document.documentElement.dir = lang === "en" ? "ltr" : "rtl";
+  }, [lang]);
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+    const handler = (e) => { e.preventDefault(); setPwaPrompt(e); setShowPwaBanner(true); };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const handleCompare = (product) => {
+    const pid = String(product.id);
+    setCompareList(prev => {
+      if (prev.some(p => String(p.id) === pid)) return prev.filter(p => String(p.id) !== pid);
+      if (prev.length >= 3) return prev;
+      return [...prev, product];
+    });
+    setShowCompareBar(true);
+  };
+
+  const compareSet = new Set(compareList.map(p => String(p.id)));
 
   const navigate = (screen, meta = null) => {
     setPrevScreen(currentScreen);
     if (screen === "shop" && meta) setSelectedCategory(meta);
     else if (screen !== "shop") setSelectedCategory(null);
+    if (screen === "sellerPublic" && meta?.sellerId) setSelectedSellerId(meta.sellerId);
     setCurrentScreen(screen);
   };
 
@@ -4994,12 +5555,12 @@ export default function DoctorCarsApp() {
     );
   }
 
-  const screensWithBack = ["productDetail", "notifications", "cart", "diagnosis", "emergency", "request", "academy", "sellerDash", "admin", "sellerProfile", "myOrders", "favorites", "myReviews", "messages", "addresses", "payments"];
+  const screensWithBack = ["productDetail", "notifications", "cart", "diagnosis", "emergency", "request", "academy", "sellerDash", "admin", "sellerProfile", "myOrders", "favorites", "myReviews", "messages", "addresses", "payments", "sellerPublic", "comparison", "priceEstimator"];
 
   const renderScreen = () => {
     switch (currentScreen) {
       case "home": return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} notifCount={unreadNotifCount} profile={profile} session={session} favSet={favSet} onFavToggle={toggleFavorite} />;
-      case "shop": return <ShopScreen onProductView={handleProductView} onCartAdd={handleCartAdd} initialCategory={selectedCategory} favSet={favSet} onFavToggle={toggleFavorite} />;
+      case "shop": return <ShopScreen onProductView={handleProductView} onCartAdd={handleCartAdd} initialCategory={selectedCategory} favSet={favSet} onFavToggle={toggleFavorite} onCompare={handleCompare} compareSet={compareSet} />;
       case "auctions": return <AuctionsScreen onNavigate={navigate} session={session} />;
       case "garage": return <GarageScreen session={session} />;
       case "profile": return <ProfileScreen onLogout={signOut} onNavigate={navigate} profile={profile} session={session} />;
@@ -5018,11 +5579,17 @@ export default function DoctorCarsApp() {
       case "favorites": return <FavoritesScreen session={session} onProductView={handleProductView} onCartAdd={handleCartAdd} favSet={favSet} onFavToggle={toggleFavorite} />;
       case "myReviews": return <MyReviewsScreen session={session} />;
       case "admin": return profile?.is_admin ? <AdminScreen /> : <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} profile={profile} session={session} favSet={favSet} onFavToggle={toggleFavorite} />;
+      case "sellerPublic": return <SellerPublicScreen sellerId={selectedSellerId} onProductView={handleProductView} onCartAdd={handleCartAdd} session={session} onNavigate={navigate} favSet={favSet} onFavToggle={toggleFavorite} />;
+      case "comparison": return <ComparisonScreen compareList={compareList} onClear={() => setCompareList([])} onRemove={(id) => setCompareList(prev => prev.filter(p => String(p.id) !== String(id)))} onCartAdd={handleCartAdd} />;
+      case "priceEstimator": return <CarPriceEstimatorScreen session={session} onCartAdd={handleCartAdd} onProductView={handleProductView} />;
       default: return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} profile={profile} session={session} favSet={favSet} onFavToggle={toggleFavorite} />;
     }
   };
 
   const showBackHeader = screensWithBack.includes(currentScreen);
+
+  const SCREEN_ICONS = { productDetail: "🔧", notifications: "🔔", cart: "🛒", diagnosis: "🤖", emergency: "🚨", request: "📋", academy: "🎓", sellerDash: "🏪", admin: "🛡️", sellerProfile: "🏬", myOrders: "📦", favorites: "❤️", myReviews: "⭐", messages: "💬", addresses: "📍", payments: "💳", sellerPublic: "🏬", comparison: "⊕", priceEstimator: "💰" };
+  const SCREEN_TITLES = { productDetail: "تفاصيل المنتج", notifications: "الإشعارات", cart: "السلة", diagnosis: "تشخيص الأعطال", emergency: "خدمات الطوارئ", request: "طلب قطعة", academy: "الأكاديمية", sellerDash: "لوحة البائع", admin: "لوحة الإدارة", sellerProfile: "ملف البائع", myOrders: "طلباتي", favorites: "مفضلاتي", myReviews: "مراجعاتي", messages: "رسائلي", addresses: "عناويني", payments: "طرق الدفع", sellerPublic: "ملف المتجر", comparison: "مقارنة المنتجات", priceEstimator: "تقدير السعر" };
 
   return (
     <div dir="rtl" style={{ fontFamily: "'Cairo', 'Tajawal', 'Segoe UI', sans-serif", background: T.navy, minHeight: "100vh", maxWidth: 480, margin: "0 auto", position: "relative" }}>
@@ -5037,23 +5604,53 @@ export default function DoctorCarsApp() {
         select option { background: ${T.navyCard}; }
       `}</style>
 
+      {/* PWA INSTALL BANNER */}
+      {showPwaBanner && pwaPrompt && (
+        <div style={{ position: "fixed", top: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, zIndex: 999, background: T.gold, color: T.navy, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", fontSize: 13, fontWeight: 700 }}>
+          <span>📲 ثبّت التطبيق على جهازك!</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => { pwaPrompt.prompt(); setShowPwaBanner(false); }} style={{ background: T.navy, color: T.gold, border: "none", borderRadius: 8, padding: "4px 12px", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 12 }}>تثبيت</button>
+            <button onClick={() => setShowPwaBanner(false)} style={{ background: "none", border: "none", color: T.navy, cursor: "pointer", fontSize: 16, fontWeight: 700 }}>✕</button>
+          </div>
+        </div>
+      )}
+
       {/* TOP HEADER for sub-screens */}
       {showBackHeader && (
         <div style={{ position: "sticky", top: 0, zIndex: 100, background: `${T.navy}EE`, backdropFilter: "blur(10px)", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, borderBottom: `1px solid ${T.navyBorder}` }}>
           <button onClick={() => navigate(prevScreen)} style={{ background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: T.textPrimary, fontSize: 18 }}>→</button>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: 18 }}>{{ productDetail: "🔧", notifications: "🔔", cart: "🛒", diagnosis: "🤖", emergency: "🚨", request: "📋", academy: "🎓", sellerDash: "🏪", admin: "🛡️", sellerProfile: "🏬", myOrders: "📦", favorites: "❤️", myReviews: "⭐", messages: "💬", addresses: "📍", payments: "💳" }[currentScreen]}</span>
-            <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16 }}>
-              {{ productDetail: "تفاصيل المنتج", notifications: "الإشعارات", cart: "السلة", diagnosis: "تشخيص الأعطال", emergency: "خدمات الطوارئ", request: "طلب قطعة", academy: "الأكاديمية", sellerDash: "لوحة البائع", admin: "لوحة الإدارة", sellerProfile: "ملف البائع", myOrders: "طلباتي", favorites: "مفضلاتي", myReviews: "مراجعاتي", messages: "رسائلي", addresses: "عناويني", payments: "طرق الدفع" }[currentScreen]}
-            </span>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1 }}>
+            <span style={{ fontSize: 18 }}>{SCREEN_ICONS[currentScreen]}</span>
+            <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16 }}>{SCREEN_TITLES[currentScreen]}</span>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setThemeMode(m => m === "dark" ? "light" : "dark")} style={{ background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center" }}>{themeMode === "dark" ? "☀️" : "🌙"}</button>
+            <button onClick={() => setLang(l => { const next = l === "ar" ? "en" : "ar"; localStorage.setItem("lang", next); return next; })} style={{ background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 8, height: 32, padding: "0 8px", cursor: "pointer", fontSize: 11, fontWeight: 700, color: T.textPrimary, fontFamily: "inherit" }}>{lang === "ar" ? "EN" : "AR"}</button>
           </div>
         </div>
       )}
 
       {/* MAIN CONTENT */}
-      <main style={{ paddingBottom: showBackHeader ? 20 : 90, minHeight: "100vh" }}>
+      <main style={{ paddingBottom: showBackHeader ? 20 : 90, minHeight: "100vh", paddingTop: showPwaBanner && pwaPrompt ? 44 : 0 }}>
         {renderScreen()}
       </main>
+
+      {/* FLOATING COMPARISON BAR */}
+      {compareList.length > 0 && !showBackHeader && (
+        <div style={{ position: "fixed", bottom: 155, left: "50%", transform: "translateX(-50%)", zIndex: 200, background: T.navyCard, border: `1px solid ${T.gold}`, borderRadius: 16, padding: "8px 14px", display: "flex", alignItems: "center", gap: 10, boxShadow: "0 4px 20px #0008" }}>
+          <span style={{ color: T.gold, fontWeight: 700, fontSize: 12 }}>⊕ مقارنة ({compareList.length}/3)</span>
+          <div style={{ display: "flex", gap: 6 }}>
+            {compareList.map(p => (
+              <div key={p.id} style={{ position: "relative" }}>
+                <span style={{ fontSize: 10, color: T.textSecondary, background: T.navyLight, borderRadius: 6, padding: "2px 6px", maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{p.name?.slice(0, 8)}</span>
+                <button onClick={() => setCompareList(prev => prev.filter(x => String(x.id) !== String(p.id)))} style={{ position: "absolute", top: -6, left: -4, background: T.red, border: "none", borderRadius: "50%", width: 14, height: 14, cursor: "pointer", fontSize: 9, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>✕</button>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => navigate("comparison")} style={{ background: T.gold, color: T.navy, border: "none", borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 11 }}>قارن</button>
+          <button onClick={() => setCompareList([])} style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 13 }}>✕</button>
+        </div>
+      )}
 
       {/* SHORTCUT TOOLBAR (floating) */}
       {!showBackHeader && (
@@ -5063,6 +5660,7 @@ export default function DoctorCarsApp() {
             { icon: "🚨", screen: "emergency", label: "طوارئ" },
             { icon: "📋", screen: "request", label: "اطلب قطعة" },
             { icon: "🎓", screen: "academy", label: "الأكاديمية" },
+            { icon: "💰", screen: "priceEstimator", label: "تقدير السعر" },
           ].map(item => (
             <button key={item.screen} onClick={() => navigate(item.screen)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "4px 8px" }}>
               <span style={{ fontSize: 18 }}>{item.icon}</span>
@@ -5088,6 +5686,10 @@ export default function DoctorCarsApp() {
               </button>
             );
           })}
+          <button onClick={() => setThemeMode(m => m === "dark" ? "light" : "dark")} style={{ flex: 1, background: "none", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "pointer", padding: "4px 0" }}>
+            <span style={{ fontSize: 22, opacity: 0.5 }}>{themeMode === "dark" ? "☀️" : "🌙"}</span>
+            <span style={{ fontSize: 10, color: T.textMuted, fontFamily: "inherit" }}>{themeMode === "dark" ? "فاتح" : "داكن"}</span>
+          </button>
         </nav>
       )}
 
