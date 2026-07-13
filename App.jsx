@@ -1782,15 +1782,21 @@ const AuctionsScreen = ({ onNavigate, session }) => {
   };
 
   const handleBid = async (auctionId) => {
-    if (!user) {
+    if (!session?.user?.id) {
       setBidState(p => ({ ...p, [auctionId]: { error: "يجب تسجيل الدخول أولاً للمزايدة" } }));
       return;
     }
-    const amount = Number(bidAmount[auctionId]);
-    if (!amount) return;
+    const rawVal = bidAmount[auctionId];
+    const amount = Number(rawVal);
+    if (!rawVal || !amount || isNaN(amount)) {
+      setBidState(p => ({ ...p, [auctionId]: { error: "أدخل مبلغاً صحيحاً للمزايدة" } }));
+      return;
+    }
+    console.log("BID ATTEMPT:", auctionId, session.user.id, amount);
     setBidState(p => ({ ...p, [auctionId]: { loading: true, error: null, success: false } }));
-    const { error } = await supabase.from("bids").insert({ auction_id: auctionId, bidder_id: user.id, amount });
+    const { error } = await supabase.from("bids").insert({ auction_id: auctionId, bidder_id: session.user.id, amount });
     if (error) {
+      console.error("BID ERROR:", error);
       setBidState(p => ({ ...p, [auctionId]: { error: error.message } }));
     } else {
       setBidState(p => ({ ...p, [auctionId]: { success: true } }));
@@ -5386,22 +5392,14 @@ export default function DoctorCarsApp() {
   const [selectedSellerId, setSelectedSellerId] = useState(null);
   const [compareList, setCompareList] = useState([]);
   const [showCompareBar, setShowCompareBar] = useState(false);
-  const [themeMode, setThemeMode] = useState(() => { const h = new Date().getHours(); return (h >= 6 && h < 18) ? "light" : "dark"; });
+  const themeMode = "dark";
   const [lang, setLang] = useState(() => localStorage.getItem("lang") || "ar");
   const [pwaPrompt, setPwaPrompt] = useState(null);
   const [showPwaBanner, setShowPwaBanner] = useState(false);
 
   useEffect(() => {
-    Object.assign(T, themeMode === "light" ? LIGHT_COLORS : DARK_COLORS);
-    document.documentElement.setAttribute("data-theme", themeMode);
-  }, [themeMode]);
-
-  useEffect(() => {
-    const tick = () => { const h = new Date().getHours(); setThemeMode((h >= 6 && h < 18) ? "light" : "dark"); };
-    const id = setInterval(tick, 30 * 60 * 1000);
-    const onVisible = () => { if (document.visibilityState === "visible") tick(); };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
+    Object.assign(T, DARK_COLORS);
+    document.documentElement.setAttribute("data-theme", "dark");
   }, []);
 
   useEffect(() => {
