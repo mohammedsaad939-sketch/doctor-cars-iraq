@@ -561,6 +561,8 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
 };
 
 // ── HOME SCREEN ──────────────────────────────────────
+let _homeStatsCache = null;
+let _topSellersCache = null;
 const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCount = 0, profile, session, favSet, onFavToggle }) => {
   const [searchText, setSearchText] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -658,16 +660,24 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
   }, []);
 
   useEffect(() => {
+    if (_homeStatsCache) {
+      setMarketStats(_homeStatsCache);
+      setTopSellers(_topSellersCache || []);
+      return;
+    }
     Promise.all([
       supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "active"),
       supabase.from("sellers").select("id", { count: "exact", head: true }),
       supabase.from("orders").select("id", { count: "exact", head: true }),
       supabase.from("auctions").select("id", { count: "exact", head: true }),
     ]).then(([{ count: products }, { count: sellers }, { count: orders }, { count: auctions }]) => {
-      setMarketStats({ products: products || 0, sellers: sellers || 0, orders: orders || 0, auctions: auctions || 0 });
+      const stats = { products: products || 0, sellers: sellers || 0, orders: orders || 0, auctions: auctions || 0 };
+      setMarketStats(stats);
+      _homeStatsCache = stats;
     });
     supabase.from("sellers").select("id, store_name, specialty, seller_type, phone, is_verified").limit(4).then(({ data }) => {
       setTopSellers(data || []);
+      _topSellersCache = data || [];
     });
   }, []);
 
@@ -1079,8 +1089,10 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
 
 // ── SHOP SCREEN ──────────────────────────────────────
 const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null, favSet, onFavToggle, onCompare, compareSet }) => {
-  const [products, setProducts] = useState(MOCK.products);
+  const [products, setProducts] = useState([]);
+  const [shopLoading, setShopLoading] = useState(true);
   useEffect(() => {
+    setShopLoading(true);
     supabase.from("products").select("*, sellers(store_name, verified, is_verified, rating), categories(name)").eq("status", "active").then(({ data, error }) => {
       if (!error && data) {
         setProducts(data.map(p => ({
@@ -1110,6 +1122,7 @@ const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null, favSet, 
           is_promoted: p.is_promoted || false,
         })));
       }
+      setShopLoading(false);
     });
   }, []);
 
@@ -1223,9 +1236,17 @@ const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null, favSet, 
         </Card>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        {filtered.map(p => <ProductCard key={p.id} product={p} onView={onProductView} onCart={onCartAdd} isFav={favSet?.has(String(p.id))} onFavToggle={onFavToggle} onCompare={onCompare} inCompare={compareSet?.has(String(p.id))} />)}
-      </div>
+      {shopLoading ? (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {[1,2,3,4].map(i => (
+            <div key={i} style={{ background: T.navyCard, borderRadius: 16, height: 200, animation: "pulse 1.5s ease-in-out infinite" }} />
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {filtered.map(p => <ProductCard key={p.id} product={p} onView={onProductView} onCart={onCartAdd} isFav={favSet?.has(String(p.id))} onFavToggle={onFavToggle} onCompare={onCompare} inCompare={compareSet?.has(String(p.id))} />)}
+        </div>
+      )}
     </div>
   );
 };
@@ -1261,10 +1282,13 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile, fav
   useEffect(() => {
     if (!product?.seller_id) return;
     const sid = product.seller_id;
-    supabase.from("sellers").select("store_name, verified, is_verified, rating, created_at, phone, whatsapp, owner_id, response_rate, id").eq("id", sid).single()
-      .then(({ data }) => setSellerInfo(data || null));
-    supabase.from("products").select("id", { count: "exact", head: true }).eq("seller_id", sid)
-      .then(({ count }) => setSellerProductCount(count || 0));
+    Promise.all([
+      supabase.from("sellers").select("store_name, verified, is_verified, rating, created_at, phone, whatsapp, owner_id, response_rate, id").eq("id", sid).single(),
+      supabase.from("products").select("id", { count: "exact", head: true }).eq("seller_id", sid),
+    ]).then(([{ data: sellerData }, { count }]) => {
+      setSellerInfo(sellerData || null);
+      setSellerProductCount(count || 0);
+    });
   }, [product?.seller_id]);
 
   useEffect(() => {
