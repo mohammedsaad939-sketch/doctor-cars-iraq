@@ -570,10 +570,16 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
   const [categoryCounts, setCategoryCounts] = useState({});
   const [marketStats, setMarketStats] = useState(null);
   const [topSellers, setTopSellers] = useState([]);
+  const [liveAuctions, setLiveAuctions] = useState([]);
 
   useEffect(() => {
-    const timer = setInterval(() => setActiveAuction(p => (p + 1) % MOCK.auctions.length), 5000);
-    return () => clearInterval(timer);
+    const fetchLive = () => {
+      supabase.from("auctions").select("title, current_price, ends_at").eq("status", "live").order("ends_at", { ascending: true }).limit(5)
+        .then(({ data }) => setLiveAuctions(data || []));
+    };
+    fetchLive();
+    const t = setInterval(fetchLive, 30000);
+    return () => clearInterval(t);
   }, []);
 
   useEffect(() => {
@@ -817,20 +823,22 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
         </div>
 
         {/* ACTIVE AUCTION TICKER */}
-        <div style={{ background: `linear-gradient(135deg, ${T.gold}22, ${T.goldDark}11)`, border: `1px solid ${T.gold}44`, borderRadius: 14, padding: "12px 16px", marginBottom: 20, cursor: "pointer" }} onClick={() => onNavigate("auctions")}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ width: 8, height: 8, background: T.red, borderRadius: "50%", animation: "pulse 1s infinite" }} />
-              <span style={{ color: T.gold, fontWeight: 800, fontSize: 13 }}>🏆 مزاد مباشر</span>
+        {liveAuctions.length > 0 && (
+          <div style={{ background: `linear-gradient(135deg, ${T.gold}22, ${T.goldDark}11)`, border: `1px solid ${T.gold}44`, borderRadius: 14, padding: "12px 16px", marginBottom: 20, cursor: "pointer", overflowX: "auto" }} onClick={() => onNavigate("auctions")}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ width: 8, height: 8, background: T.red, borderRadius: "50%", animation: "pulse 1s infinite", flexShrink: 0 }} />
+              <span style={{ color: T.gold, fontWeight: 800, fontSize: 13 }}>🏆 مزادات مباشرة</span>
             </div>
-            <span style={{ color: T.red, fontWeight: 700, fontSize: 13, fontFamily: "monospace" }}>{MOCK.auctions[activeAuction].timeLeft}</span>
+            <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 4 }}>
+              {liveAuctions.map((a, i) => (
+                <div key={i} style={{ flexShrink: 0, background: T.navyCard, borderRadius: 10, padding: "8px 12px", minWidth: 160, border: `1px solid ${T.gold}33` }}>
+                  <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 12, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>🔴 {a.title}</div>
+                  <div style={{ color: T.gold, fontWeight: 900, fontSize: 13 }}>{(a.current_price || 0).toLocaleString("ar-IQ")} د.ع</div>
+                </div>
+              ))}
+            </div>
           </div>
-          <p style={{ margin: "6px 0 4px", color: T.textPrimary, fontSize: 14, fontWeight: 700 }}>{MOCK.auctions[activeAuction].title}</p>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ color: T.textSecondary, fontSize: 12 }}>السعر الحالي: <span style={{ color: T.gold, fontWeight: 800 }}>{MOCK.auctions[activeAuction].currentBid.toLocaleString("ar-IQ")} د.ع</span></span>
-            <span style={{ color: T.textSecondary, fontSize: 11 }}>{MOCK.auctions[activeAuction].bids} مزايد</span>
-          </div>
-        </div>
+        )}
 
         {/* CATEGORIES GRID */}
         {(() => {
@@ -1176,7 +1184,7 @@ const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null, favSet, 
 };
 
 // ── PRODUCT DETAIL SCREEN ──────────────────────────────────────
-const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile, favSet, onFavToggle }) => {
+const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile, favSet, onFavToggle, onNavigate, onMsgContext }) => {
   const [activeTab, setActiveTab] = useState("details");
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
@@ -1206,7 +1214,7 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile, fav
   useEffect(() => {
     if (!product?.seller_id) return;
     const sid = product.seller_id;
-    supabase.from("sellers").select("store_name, verified, rating, created_at, phone, whatsapp").eq("id", sid).single()
+    supabase.from("sellers").select("store_name, verified, rating, created_at, phone, whatsapp, owner_id").eq("id", sid).single()
       .then(({ data }) => setSellerInfo(data || null));
     supabase.from("products").select("id", { count: "exact", head: true }).eq("seller_id", sid)
       .then(({ count }) => setSellerProductCount(count || 0));
@@ -1483,7 +1491,7 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile, fav
               ))}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <Btn fullWidth size="sm" icon="💬" variant="ghost" onClick={() => { const num = toWhatsAppNumber(sellerInfo?.whatsapp || sellerInfo?.phone); if (num) window.open(`https://wa.me/${num}?text=${encodeURIComponent(`مرحباً، أنا مهتم بمنتجك: ${product.name}`)}`); }}>رسالة</Btn>
+              <Btn fullWidth size="sm" icon="💬" variant="ghost" onClick={() => { if (!session?.user?.id) return; if (sellerInfo?.owner_id && onMsgContext) { onMsgContext({ partnerId: sellerInfo.owner_id, partnerName: sellerInfo.store_name || "البائع", productId: product.id, productName: product.name }); if (onNavigate) onNavigate("messages"); } }}>راسل البائع</Btn>
               <Btn fullWidth size="sm" icon="📱" variant="ghost" onClick={() => { const num = toWhatsAppNumber(sellerInfo?.whatsapp || sellerInfo?.phone); if (num) window.open(`https://wa.me/${num}`); }}>واتساب</Btn>
               <Btn fullWidth size="sm" icon="📞" variant="ghost" onClick={() => { const ph = sellerInfo?.phone; if (ph) window.open(`tel:${ph}`, "_self"); }}>اتصال</Btn>
             </div>
@@ -2238,21 +2246,30 @@ const DiagnosisScreen = ({ onCartAdd, session }) => {
 
   const runDiagnosis = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setResult({
-        severity: "متوسط",
-        causes: [
-          { cause: "تآكل أقراص الفرامل", probability: 85, parts: ["أقراص فرامل أمامية", "تيل الفرامل"] },
-          { cause: "مشكلة في نوابض التعليق", probability: 60, parts: ["نوابض تعليق", "مساعد"] },
-          { cause: "بالونات الإطارات غير متساوية", probability: 40, parts: [] },
-        ],
-        recommendation: "نوصي بمراجعة ورشة متخصصة في الفرامل في أقرب وقت. الأعراض تشير بشكل كبير إلى الحاجة لتغيير أقراص الفرامل.",
-        urgency: "خلال أسبوع",
-        relatedSellers: MOCK.products.slice(0, 2),
+    const vehicleDesc = manualMode
+      ? `${manualVehicle.brand} ${manualVehicle.model} ${manualVehicle.year}`
+      : garageVehicles.find(v => v.id === vehicle) ? `${garageVehicles.find(v => v.id === vehicle).brand} ${garageVehicles.find(v => v.id === vehicle).model} ${garageVehicles.find(v => v.id === vehicle).year}` : vehicle;
+    const symptomsList = symptoms.length > 0 ? `الأعراض: ${symptoms.join("، ")}` : "";
+    const userInput = `${vehicleDesc ? `السيارة: ${vehicleDesc}. ` : ""}${symptomsList}${description ? `. ${description}` : ""}`;
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY || "", "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: `أنت خبير ميكانيكي سيارات محترف. المستخدم يصف مشكلة في سيارته: "${userInput}"\n\nقدم تشخيصاً مختصراً وعملياً باللغة العربية يتضمن:\n1. الأسباب المحتملة (2-3 أسباب)\n2. مدى خطورة المشكلة (عالية/متوسطة/منخفضة)\n3. هل يمكن الاستمرار بالقيادة؟\n4. التوصية: إصلاح فوري أم يمكن الانتظار؟\n\nكن مباشراً ومفيداً. لا تطول.` }]
+        })
       });
-      setLoading(false);
-      setStep(3);
-    }, 2500);
+      const data = await response.json();
+      const diagnosis = data?.content?.[0]?.text || null;
+      if (!diagnosis) throw new Error("empty");
+      setResult({ text: diagnosis, isRealAI: true });
+    } catch {
+      setResult({ text: "تعذر الاتصال بخدمة التشخيص. حاول مرة أخرى.", isRealAI: true, isError: true });
+    }
+    setLoading(false);
+    setStep(3);
   };
 
   return (
@@ -2362,43 +2379,12 @@ const DiagnosisScreen = ({ onCartAdd, session }) => {
 
       {step === 3 && result && (
         <div>
-          <div style={{ background: `${T.orange}22`, border: `1px solid ${T.orange}44`, borderRadius: 14, padding: 16, marginBottom: 16, display: "flex", gap: 10 }}>
-            <span style={{ fontSize: 24 }}>⚠️</span>
-            <div>
-              <div style={{ color: T.orange, fontWeight: 800, fontSize: 14 }}>خطورة: {result.severity}</div>
-              <div style={{ color: T.textSecondary, fontSize: 12 }}>يجب الإصلاح {result.urgency}</div>
-            </div>
-          </div>
-
-          <h3 style={{ color: T.textPrimary, fontSize: 15, fontWeight: 800, marginBottom: 12 }}>الأسباب المحتملة</h3>
-          {result.causes.map((c, i) => (
-            <Card key={i} style={{ marginBottom: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <span style={{ color: T.textPrimary, fontWeight: 700 }}>{c.cause}</span>
-                <span style={{ color: c.probability > 70 ? T.red : c.probability > 50 ? T.orange : T.green, fontWeight: 700, fontSize: 15 }}>{c.probability}%</span>
-              </div>
-              <div style={{ background: T.navyLight, borderRadius: 6, height: 6, overflow: "hidden", marginBottom: 8 }}>
-                <div style={{ height: "100%", width: `${c.probability}%`, background: c.probability > 70 ? T.red : c.probability > 50 ? T.orange : T.green, borderRadius: 6 }} />
-              </div>
-              {c.parts.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {c.parts.map(p => <Badge key={p} small color={T.blue}>{p}</Badge>)}
-                </div>
-              )}
-            </Card>
-          ))}
-
-          <Card style={{ marginBottom: 16, background: `${T.green}11`, border: `1px solid ${T.green}33` }}>
-            <h4 style={{ margin: "0 0 8px", color: T.green }}>💡 توصية الذكاء الاصطناعي</h4>
-            <p style={{ margin: 0, color: T.textSecondary, fontSize: 13, lineHeight: 1.7 }}>{result.recommendation}</p>
+          <Card style={{ marginBottom: 16, background: result.isError ? `${T.red}11` : `${T.green}11`, border: `1px solid ${result.isError ? T.red : T.green}33` }}>
+            <h4 style={{ margin: "0 0 8px", color: result.isError ? T.red : T.green }}>
+              {result.isError ? "⚠️ خطأ في الاتصال" : "💡 تشخيص الذكاء الاصطناعي"}
+            </h4>
+            <p style={{ margin: 0, color: T.textSecondary, fontSize: 13, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{result.text}</p>
           </Card>
-
-          <Section title="قطع مقترحة بالقرب منك" subtitle="بناءً على التشخيص">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {result.relatedSellers.map(p => <ProductCard key={p.id} product={p} onView={() => {}} onCart={onCartAdd || (() => {})} />)}
-            </div>
-          </Section>
-
           <div style={{ display: "flex", gap: 10 }}>
             <Btn variant="ghost" fullWidth onClick={() => { setStep(1); setResult(null); setSymptoms([]); setDescription(""); }}>تشخيص جديد</Btn>
             <Btn fullWidth icon="🏪">أقرب ورشة</Btn>
@@ -3672,12 +3658,19 @@ const AdminScreen = () => {
   const [userSearch, setUserSearch] = useState("");
   const [adminUpdateMsg, setAdminUpdateMsg] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(null);
+  const [openRequestsCount, setOpenRequestsCount] = useState(null);
 
   useEffect(() => {
     if (activeTab !== "users" || users.length > 0) return;
     setUsersLoading(true);
     supabase.from("profiles").select("id, full_name, is_admin, created_at").order("created_at", { ascending: false }).limit(50)
       .then(({ data }) => { setUsers(data || []); setUsersLoading(false); });
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "violations" || openRequestsCount !== null) return;
+    supabase.from("part_requests").select("id", { count: "exact", head: true }).eq("status", "open")
+      .then(({ count }) => setOpenRequestsCount(count || 0));
   }, [activeTab]);
 
   const handleAdminToggle = async (userId, makeAdmin) => {
@@ -3805,43 +3798,30 @@ const AdminScreen = () => {
 
       {activeTab === "violations" && (
         <div>
-          <div style={{ background: `${T.red}15`, border: `1px solid ${T.red}33`, borderRadius: 14, padding: 14, marginBottom: 16, display: "flex", gap: 10 }}>
-            <span style={{ fontSize: 24 }}>🤖</span>
-            <p style={{ margin: 0, color: T.textSecondary, fontSize: 13, lineHeight: 1.6 }}>
-              الذكاء الاصطناعي يقوم بمراقبة كل المحتوى تلقائياً. أي إعلان لا يتعلق بالسيارات يُرفض فوراً ولا ينشر.
-            </p>
-          </div>
-          {[
-            { content: "إعلان بيع هاتف نقال", user: "أبو حسن", action: "رُفض", severity: "عالية" },
-            { content: "صورة غير لائقة في منتج", user: "محل X", action: "تحقيق", severity: "عالية" },
-            { content: "سعر مبالغ فيه - فلتر", user: "بائع Y", action: "تحذير", severity: "متوسطة" },
-          ].map((v, i) => (
-            <Card key={i} style={{ marginBottom: 10, border: `1px solid ${T.red}33` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <Badge small color={v.severity === "عالية" ? T.red : T.orange}>⚠️ {v.severity}</Badge>
-                <Badge small color={v.action === "رُفض" ? T.red : v.action === "تحذير" ? T.orange : T.blue}>{v.action}</Badge>
+          {openRequestsCount !== null && (
+            <Card style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 12, background: `${T.orange}11`, border: `1px solid ${T.orange}33` }}>
+              <span style={{ fontSize: 28 }}>📋</span>
+              <div>
+                <div style={{ color: T.textPrimary, fontWeight: 800, fontSize: 14 }}>طلبات قطع مفتوحة: {openRequestsCount}</div>
+                <div style={{ color: T.textMuted, fontSize: 12 }}>طلبات تحتاج متابعة من فريق الدعم</div>
               </div>
-              <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>{v.content}</p>
-              <p style={{ margin: 0, color: T.textMuted, fontSize: 12 }}>المستخدم: {v.user}</p>
             </Card>
-          ))}
+          )}
+          <Card style={{ textAlign: "center", padding: 40, background: `${T.red}08`, border: `1px solid ${T.red}22` }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>⚠️</div>
+            <h3 style={{ margin: "0 0 8px", color: T.textPrimary, fontSize: 16, fontWeight: 800 }}>لوحة المخالفات</h3>
+            <p style={{ margin: 0, color: T.textSecondary, fontSize: 13, lineHeight: 1.7 }}>هذه اللوحة قيد التطوير — ستكون متاحة في إصدار قادم</p>
+          </Card>
         </div>
       )}
 
       {activeTab === "finance" && (
         <div>
-          {[
-            ["إيرادات الاشتراكات", "٢,٤٥٠,٠٠٠ د.ع"],
-            ["رسوم المزادات", "٨٧٠,٠٠٠ د.ع"],
-            ["الإعلانات المدفوعة", "١,٢٣٠,٠٠٠ د.ع"],
-            ["عمولات التوصيل", "٣٤٠,٠٠٠ د.ع"],
-            ["إجمالي الشهر", "٤,٨٩٠,٠٠٠ د.ع"],
-          ].map(([label, value], i) => (
-            <Card key={i} style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center", background: i === 4 ? `${T.gold}15` : T.navyCard, border: i === 4 ? `1px solid ${T.gold}44` : `1px solid ${T.navyBorder}` }}>
-              <span style={{ color: i === 4 ? T.textPrimary : T.textSecondary, fontSize: 13, fontWeight: i === 4 ? 700 : 400 }}>{label}</span>
-              <span style={{ color: T.gold, fontWeight: 900, fontSize: i === 4 ? 17 : 14 }}>{value}</span>
-            </Card>
-          ))}
+          <Card style={{ textAlign: "center", padding: 40, background: `${T.gold}08`, border: `1px solid ${T.gold}22` }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>💰</div>
+            <h3 style={{ margin: "0 0 8px", color: T.textPrimary, fontSize: 16, fontWeight: 800 }}>اللوحة المالية</h3>
+            <p style={{ margin: 0, color: T.textSecondary, fontSize: 13, lineHeight: 1.7 }}>هذه اللوحة قيد التطوير — ستكون متاحة في إصدار قادم</p>
+          </Card>
         </div>
       )}
     </div>
@@ -4412,11 +4392,188 @@ const MyReviewsScreen = ({ session }) => {
   );
 };
 
+// ── MESSAGES SCREEN ──────────────────────────────────────
+const MessagesScreen = ({ session, msgContext, onClearMsgContext }) => {
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeConv, setActiveConv] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [msgText, setMsgText] = useState("");
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (msgContext) { setActiveConv(msgContext); if (onClearMsgContext) onClearMsgContext(); }
+  }, []);
+
+  useEffect(() => {
+    if (!session?.user?.id || activeConv) return;
+    const uid = session.user.id;
+    supabase.from("messages")
+      .select("*, sender:sender_id(id,full_name), receiver:receiver_id(id,full_name), products(name)")
+      .or(`sender_id.eq.${uid},receiver_id.eq.${uid}`)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        const convMap = {};
+        (data || []).forEach(msg => {
+          const partner = msg.sender_id === uid ? msg.receiver : msg.sender;
+          if (!partner) return;
+          const pid = partner.id;
+          if (!convMap[pid]) convMap[pid] = { partner, lastMsg: msg, unread: 0, productName: msg.products?.name };
+          if (msg.receiver_id === uid && !msg.is_read) convMap[pid].unread++;
+        });
+        setConversations(Object.values(convMap));
+        setLoading(false);
+      });
+  }, [session?.user?.id, activeConv]);
+
+  useEffect(() => {
+    if (!activeConv || !session?.user?.id) return;
+    const uid = session.user.id;
+    const pid = activeConv.partnerId;
+    supabase.from("messages")
+      .select("*")
+      .or(`and(sender_id.eq.${uid},receiver_id.eq.${pid}),and(sender_id.eq.${pid},receiver_id.eq.${uid})`)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => setMessages(data || []));
+    supabase.from("messages").update({ is_read: true }).eq("sender_id", pid).eq("receiver_id", uid).eq("is_read", false);
+    const channel = supabase.channel(`msgs-${uid}-${pid}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `receiver_id=eq.${uid}` }, payload => {
+        const m = payload.new;
+        if (m.sender_id === pid) {
+          setMessages(prev => [...prev, m]);
+          supabase.from("messages").update({ is_read: true }).eq("id", m.id);
+        }
+      }).subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [activeConv?.partnerId]);
+
+  const sendMessage = async () => {
+    if (!msgText.trim() || sending || !session?.user?.id) return;
+    setSending(true);
+    const uid = session.user.id;
+    const { data, error } = await supabase.from("messages").insert({ sender_id: uid, receiver_id: activeConv.partnerId, product_id: activeConv.productId || null, content: msgText.trim() }).select().single();
+    if (!error && data) setMessages(prev => [...prev, data]);
+    setMsgText("");
+    setSending(false);
+  };
+
+  if (!session?.user?.id) {
+    return (
+      <div style={{ padding: 16 }}>
+        <Card style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🔒</div>
+          <p style={{ color: T.textSecondary, margin: 0 }}>سجّل دخولك لعرض رسائلك</p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (activeConv) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 60px)" }}>
+        <div style={{ padding: "10px 16px", background: T.navyCard, borderBottom: `1px solid ${T.navyBorder}`, display: "flex", alignItems: "center", gap: 10 }}>
+          <button onClick={() => { setActiveConv(null); setMessages([]); setLoading(true); }} style={{ background: T.navyLight, border: `1px solid ${T.navyBorder}`, borderRadius: 8, width: 32, height: 32, cursor: "pointer", color: T.textPrimary, fontSize: 16 }}>→</button>
+          <div>
+            <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{activeConv.partnerName}</div>
+            {activeConv.productName && <div style={{ color: T.textMuted, fontSize: 11 }}>📦 {activeConv.productName}</div>}
+          </div>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+          {messages.map((msg, i) => {
+            const isMine = msg.sender_id === session.user.id;
+            return (
+              <div key={msg.id || i} style={{ display: "flex", justifyContent: isMine ? "flex-start" : "flex-end" }}>
+                <div style={{ maxWidth: "75%", background: isMine ? T.gold : T.navyCard, color: isMine ? "#000" : T.textPrimary, borderRadius: 12, padding: "8px 12px", fontSize: 13, border: isMine ? "none" : `1px solid ${T.navyBorder}` }}>
+                  <div>{msg.content}</div>
+                  <div style={{ fontSize: 10, opacity: 0.6, marginTop: 3 }}>{relativeTime(msg.created_at)}</div>
+                </div>
+              </div>
+            );
+          })}
+          {messages.length === 0 && <div style={{ textAlign: "center", color: T.textMuted, fontSize: 13, marginTop: 40 }}>ابدأ المحادثة</div>}
+        </div>
+        <div style={{ padding: "10px 16px", display: "flex", gap: 8, background: T.navyCard, borderTop: `1px solid ${T.navyBorder}` }}>
+          <input value={msgText} onChange={e => setMsgText(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="اكتب رسالة..." style={{ flex: 1, background: T.navyLight, border: `1px solid ${T.navyBorder}`, borderRadius: 20, padding: "8px 14px", color: T.textPrimary, fontFamily: "inherit", fontSize: 13, outline: "none" }} />
+          <button onClick={sendMessage} disabled={sending} style={{ background: T.gold, border: "none", borderRadius: 20, padding: "8px 16px", color: "#000", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>إرسال</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: 16 }}>
+      <h2 style={{ margin: "0 0 16px", color: T.textPrimary, fontSize: 20, fontWeight: 800 }}>رسائلي 💬</h2>
+      {loading ? <div style={{ textAlign: "center", padding: 40, color: T.textMuted }}>جارٍ التحميل...</div> : conversations.length === 0 ? (
+        <Card style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>💬</div>
+          <p style={{ color: T.textSecondary, margin: 0 }}>لا توجد رسائل بعد</p>
+        </Card>
+      ) : conversations.map((conv, i) => (
+        <Card key={i} style={{ marginBottom: 10, cursor: "pointer" }} onClick={() => setActiveConv({ partnerId: conv.partner.id, partnerName: conv.partner.full_name, productId: conv.lastMsg?.product_id || null, productName: conv.productName || null })}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <div style={{ width: 40, height: 40, borderRadius: "50%", background: T.navyLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>👤</div>
+              <div>
+                <div style={{ color: T.textPrimary, fontWeight: 700, fontSize: 14 }}>{conv.partner.full_name}</div>
+                <div style={{ color: T.textMuted, fontSize: 12 }}>{(conv.lastMsg?.content || "").substring(0, 40)}{(conv.lastMsg?.content || "").length > 40 ? "..." : ""}</div>
+                {conv.productName && <div style={{ color: T.blue, fontSize: 11 }}>📦 {conv.productName}</div>}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+              <span style={{ color: T.textMuted, fontSize: 10 }}>{relativeTime(conv.lastMsg?.created_at)}</span>
+              {conv.unread > 0 && <span style={{ background: T.red, color: "#fff", borderRadius: 10, padding: "2px 7px", fontSize: 11, fontWeight: 700 }}>{conv.unread}</span>}
+            </div>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+};
+
+// ── ADDRESSES SCREEN ──────────────────────────────────────
+const AddressesScreen = () => {
+  const [toasted, setToasted] = useState(false);
+  return (
+    <div style={{ padding: 16 }}>
+      <Card style={{ textAlign: "center", padding: 48 }}>
+        <div style={{ fontSize: 56, marginBottom: 14 }}>📍</div>
+        <h3 style={{ margin: "0 0 10px", color: T.textPrimary, fontSize: 18, fontWeight: 800 }}>عناويني</h3>
+        <p style={{ margin: "0 0 20px", color: T.textSecondary, fontSize: 13, lineHeight: 1.7 }}>هذه الميزة ستكون متاحة قريباً. نعمل على إضافتها في التحديث القادم.</p>
+        {toasted ? (
+          <div style={{ color: T.green, fontWeight: 700, fontSize: 14 }}>سنُعلمك عند الإطلاق ✓</div>
+        ) : (
+          <Btn onClick={() => setToasted(true)}>إشعاري عند الإطلاق</Btn>
+        )}
+      </Card>
+    </div>
+  );
+};
+
+// ── PAYMENTS SCREEN ──────────────────────────────────────
+const PaymentsScreen = () => {
+  const [toasted, setToasted] = useState(false);
+  return (
+    <div style={{ padding: 16 }}>
+      <Card style={{ textAlign: "center", padding: 48 }}>
+        <div style={{ fontSize: 56, marginBottom: 14 }}>💳</div>
+        <h3 style={{ margin: "0 0 10px", color: T.textPrimary, fontSize: 18, fontWeight: 800 }}>طرق الدفع</h3>
+        <p style={{ margin: "0 0 20px", color: T.textSecondary, fontSize: 13, lineHeight: 1.7 }}>هذه الميزة ستكون متاحة قريباً. نعمل على إضافتها في التحديث القادم.</p>
+        {toasted ? (
+          <div style={{ color: T.green, fontWeight: 700, fontSize: 14 }}>سنُعلمك عند الإطلاق ✓</div>
+        ) : (
+          <Btn onClick={() => setToasted(true)}>إشعاري عند الإطلاق</Btn>
+        )}
+      </Card>
+    </div>
+  );
+};
+
 // ── PROFILE SCREEN ──────────────────────────────────────
 const ProfileScreen = ({ onLogout, onNavigate, profile, session }) => {
   const [ordersCount, setOrdersCount] = useState(null);
   const [reviewsCount, setReviewsCount] = useState(null);
   const [favCount, setFavCount] = useState(null);
+  const [msgsUnread, setMsgsUnread] = useState(null);
   useEffect(() => {
     if (!session?.user) return;
     const uid = session.user.id;
@@ -4426,15 +4583,17 @@ const ProfileScreen = ({ onLogout, onNavigate, profile, session }) => {
       .then(({ count }) => setReviewsCount(count || 0));
     supabase.from("user_favorites_count").select("count").eq("user_id", uid).single()
       .then(({ data }) => setFavCount(data?.count || 0));
+    supabase.from("messages").select("id", { count: "exact", head: true }).eq("receiver_id", uid).eq("is_read", false)
+      .then(({ count }) => setMsgsUnread(count || 0));
   }, [session?.user?.id]);
   const menuItems = [
     { icon: "🚗", label: "مركباتي", action: () => onNavigate("garage") },
     { icon: "📦", label: "طلباتي", action: () => onNavigate("myOrders") },
     { icon: "❤️", label: "مفضلاتي", action: () => onNavigate("favorites") },
     { icon: "⭐", label: "مراجعاتي", action: () => onNavigate("myReviews") },
-    { icon: "💬", label: "رسائلي", action: () => {} },
-    { icon: "💳", label: "طرق الدفع", action: () => {} },
-    { icon: "📍", label: "عناويني", action: () => {} },
+    { icon: "💬", label: "رسائلي", badge: msgsUnread, action: () => onNavigate("messages") },
+    { icon: "💳", label: "طرق الدفع", action: () => onNavigate("payments") },
+    { icon: "📍", label: "عناويني", action: () => onNavigate("addresses") },
     { icon: "🔒", label: "الأمان والخصوصية", action: () => {} },
     { icon: "📜", label: "شروط الاستخدام", action: () => {} },
     { icon: "🛡️", label: "سياسة الخصوصية", action: () => {} },
@@ -4479,6 +4638,7 @@ const ProfileScreen = ({ onLogout, onNavigate, profile, session }) => {
           }}>
             <span style={{ fontSize: 20, minWidth: 24 }}>{item.icon}</span>
             <span style={{ flex: 1, color: T.textPrimary, fontSize: 14, fontWeight: 600 }}>{item.label}</span>
+            {item.badge > 0 && <span style={{ background: T.red, color: "#fff", borderRadius: 10, padding: "2px 7px", fontSize: 11, fontWeight: 700, marginLeft: 4 }}>{item.badge}</span>}
             <span style={{ color: T.textMuted }}>←</span>
           </button>
         ))}
@@ -4699,6 +4859,7 @@ export default function DoctorCarsApp() {
   const [roleDone, setRoleDone] = useState(!!sessionStorage.getItem("role_selected"));
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [favSet, setFavSet] = useState(new Set());
+  const [msgContext, setMsgContext] = useState(null);
 
   const navigate = (screen, meta = null) => {
     setPrevScreen(currentScreen);
@@ -4833,7 +4994,7 @@ export default function DoctorCarsApp() {
     );
   }
 
-  const screensWithBack = ["productDetail", "notifications", "cart", "diagnosis", "emergency", "request", "academy", "sellerDash", "admin", "sellerProfile", "myOrders", "favorites", "myReviews"];
+  const screensWithBack = ["productDetail", "notifications", "cart", "diagnosis", "emergency", "request", "academy", "sellerDash", "admin", "sellerProfile", "myOrders", "favorites", "myReviews", "messages", "addresses", "payments"];
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -4842,7 +5003,10 @@ export default function DoctorCarsApp() {
       case "auctions": return <AuctionsScreen onNavigate={navigate} session={session} />;
       case "garage": return <GarageScreen session={session} />;
       case "profile": return <ProfileScreen onLogout={signOut} onNavigate={navigate} profile={profile} session={session} />;
-      case "productDetail": return <ProductDetailScreen product={selectedProduct} onBack={() => navigate(prevScreen)} onCartAdd={handleCartAdd} session={session} profile={profile} favSet={favSet} onFavToggle={toggleFavorite} />;
+      case "productDetail": return <ProductDetailScreen product={selectedProduct} onBack={() => navigate(prevScreen)} onCartAdd={handleCartAdd} session={session} profile={profile} favSet={favSet} onFavToggle={toggleFavorite} onNavigate={navigate} onMsgContext={setMsgContext} />;
+      case "messages": return <MessagesScreen session={session} msgContext={msgContext} onClearMsgContext={() => setMsgContext(null)} />;
+      case "addresses": return <AddressesScreen />;
+      case "payments": return <PaymentsScreen />;
       case "notifications": return <NotificationsScreen session={session} onUnreadChange={setUnreadNotifCount} />;
       case "cart": return <CartScreen session={session} onNavigate={navigate} onCartCountChange={setCartBadgeCount} profile={profile} />;
       case "diagnosis": return <DiagnosisScreen onCartAdd={handleCartAdd} session={session} />;
@@ -4878,9 +5042,9 @@ export default function DoctorCarsApp() {
         <div style={{ position: "sticky", top: 0, zIndex: 100, background: `${T.navy}EE`, backdropFilter: "blur(10px)", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, borderBottom: `1px solid ${T.navyBorder}` }}>
           <button onClick={() => navigate(prevScreen)} style={{ background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: T.textPrimary, fontSize: 18 }}>→</button>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: 18 }}>{{ productDetail: "🔧", notifications: "🔔", cart: "🛒", diagnosis: "🤖", emergency: "🚨", request: "📋", academy: "🎓", sellerDash: "🏪", admin: "🛡️", sellerProfile: "🏬", myOrders: "📦", favorites: "❤️", myReviews: "⭐" }[currentScreen]}</span>
+            <span style={{ fontSize: 18 }}>{{ productDetail: "🔧", notifications: "🔔", cart: "🛒", diagnosis: "🤖", emergency: "🚨", request: "📋", academy: "🎓", sellerDash: "🏪", admin: "🛡️", sellerProfile: "🏬", myOrders: "📦", favorites: "❤️", myReviews: "⭐", messages: "💬", addresses: "📍", payments: "💳" }[currentScreen]}</span>
             <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16 }}>
-              {{ productDetail: "تفاصيل المنتج", notifications: "الإشعارات", cart: "السلة", diagnosis: "تشخيص الأعطال", emergency: "خدمات الطوارئ", request: "طلب قطعة", academy: "الأكاديمية", sellerDash: "لوحة البائع", admin: "لوحة الإدارة", sellerProfile: "ملف البائع", myOrders: "طلباتي", favorites: "مفضلاتي", myReviews: "مراجعاتي" }[currentScreen]}
+              {{ productDetail: "تفاصيل المنتج", notifications: "الإشعارات", cart: "السلة", diagnosis: "تشخيص الأعطال", emergency: "خدمات الطوارئ", request: "طلب قطعة", academy: "الأكاديمية", sellerDash: "لوحة البائع", admin: "لوحة الإدارة", sellerProfile: "ملف البائع", myOrders: "طلباتي", favorites: "مفضلاتي", myReviews: "مراجعاتي", messages: "رسائلي", addresses: "عناويني", payments: "طرق الدفع" }[currentScreen]}
             </span>
           </div>
         </div>
