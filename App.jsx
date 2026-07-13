@@ -1980,7 +1980,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                       )}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 48, textAlign: "center", background: T.navyLight, borderRadius: 12, padding: "16px 0", marginBottom: 12 }}>🏆</div>
+                    <div style={{ fontSize: 48, textAlign: "center", background: T.navyLight, borderRadius: 12, padding: "16px 0", marginBottom: 12, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}><span>🚗</span><span style={{ fontSize: 12, color: T.textMuted }}>لا توجد صور متاحة</span></div>
                   );
                 })()}
                 {hasVehicle && (
@@ -2019,6 +2019,9 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                   )}
                 </div>
                 {auction.status === "live" && (() => {
+                  if (!user) return (
+                    <p style={{ margin: 0, color: T.textMuted, fontSize: 13, fontWeight: 600, textAlign: "center", padding: "10px 0" }}>🔒 سجّل دخولك أولاً للمزايدة</p>
+                  );
                   const bid = bidState[auction.id] || {};
                   return (
                     <div>
@@ -3568,7 +3571,7 @@ const SellerDashScreen = ({ session, profile }) => {
               <Card key={auction.id} style={{ marginBottom: 10 }}>
                 <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                   <div style={{ width: 64, height: 64, borderRadius: 10, background: T.navyLight, overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>
-                    {firstImg ? <img src={firstImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🏆"}
+                    {firstImg ? <img src={firstImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🚗"}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
@@ -5383,16 +5386,23 @@ export default function DoctorCarsApp() {
   const [selectedSellerId, setSelectedSellerId] = useState(null);
   const [compareList, setCompareList] = useState([]);
   const [showCompareBar, setShowCompareBar] = useState(false);
-  const [themeMode, setThemeMode] = useState(() => localStorage.getItem("theme") || (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"));
+  const [themeMode, setThemeMode] = useState(() => { const h = new Date().getHours(); return (h >= 6 && h < 18) ? "light" : "dark"; });
   const [lang, setLang] = useState(() => localStorage.getItem("lang") || "ar");
   const [pwaPrompt, setPwaPrompt] = useState(null);
   const [showPwaBanner, setShowPwaBanner] = useState(false);
 
   useEffect(() => {
     Object.assign(T, themeMode === "light" ? LIGHT_COLORS : DARK_COLORS);
-    localStorage.setItem("theme", themeMode);
     document.documentElement.setAttribute("data-theme", themeMode);
   }, [themeMode]);
+
+  useEffect(() => {
+    const tick = () => { const h = new Date().getHours(); setThemeMode((h >= 6 && h < 18) ? "light" : "dark"); };
+    const id = setInterval(tick, 30 * 60 * 1000);
+    const onVisible = () => { if (document.visibilityState === "visible") tick(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("lang", lang);
@@ -5624,7 +5634,6 @@ export default function DoctorCarsApp() {
             <span style={{ color: T.textPrimary, fontWeight: 700, fontSize: 16 }}>{SCREEN_TITLES[currentScreen]}</span>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => setThemeMode(m => m === "dark" ? "light" : "dark")} style={{ background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center" }}>{themeMode === "dark" ? "☀️" : "🌙"}</button>
             <button onClick={() => setLang(l => { const next = l === "ar" ? "en" : "ar"; localStorage.setItem("lang", next); return next; })} style={{ background: T.navyCard, border: `1px solid ${T.navyBorder}`, borderRadius: 8, height: 32, padding: "0 8px", cursor: "pointer", fontSize: 11, fontWeight: 700, color: T.textPrimary, fontFamily: "inherit" }}>{lang === "ar" ? "EN" : "AR"}</button>
           </div>
         </div>
@@ -5686,10 +5695,6 @@ export default function DoctorCarsApp() {
               </button>
             );
           })}
-          <button onClick={() => setThemeMode(m => m === "dark" ? "light" : "dark")} style={{ flex: 1, background: "none", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "pointer", padding: "4px 0" }}>
-            <span style={{ fontSize: 22, opacity: 0.5 }}>{themeMode === "dark" ? "☀️" : "🌙"}</span>
-            <span style={{ fontSize: 10, color: T.textMuted, fontFamily: "inherit" }}>{themeMode === "dark" ? "فاتح" : "داكن"}</span>
-          </button>
         </nav>
       )}
 
