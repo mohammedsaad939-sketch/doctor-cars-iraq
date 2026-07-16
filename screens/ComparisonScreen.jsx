@@ -25,7 +25,7 @@ const ComparisonScreen = ({ compareList, onClear, onRemove, onCartAdd }) => {
               <th style={{ padding: "8px 10px", color: T.textMuted, fontSize: 12, textAlign: "right", background: T.navyLight, borderRadius: "8px 0 0 8px", width: 80 }}>الخاصية</th>
               {compareList.map(p => (
                 <th key={p.id} style={{ padding: "8px 10px", color: T.textPrimary, fontSize: 12, background: T.navyLight, textAlign: "center", minWidth: 120 }}>
-                  <div style={{ marginBottom: 4 }}>{typeof p.image === "string" && p.image.startsWith("http") ? <img src={p.image} alt="" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 8 }} /> : <span style={{ fontSize: 24 }}>{p.image || "📦"}</span>}</div>
+                  <div style={{ marginBottom: 4 }}>{typeof p.image === "string" && p.image.startsWith("http") ? <img src={p.image} alt="" loading="lazy" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 8 }} /> : <span style={{ fontSize: 24 }}>{p.image || "📦"}</span>}</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: T.textPrimary }}>{p.name?.substring(0, 20)}</div>
                   <button onClick={() => onRemove(p.id)} style={{ background: `${T.red}22`, border: "none", borderRadius: 6, padding: "2px 6px", color: T.red, fontSize: 10, cursor: "pointer", marginTop: 4 }}>✕ إزالة</button>
                 </th>

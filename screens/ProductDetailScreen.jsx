@@ -219,7 +219,7 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile, fav
 
       {/* Product Image */}
       <div style={{ background: T.navyCard, textAlign: "center", fontSize: 80, marginBottom: 0, overflow: "hidden", height: isImageUrl(product.image) ? 260 : "auto", padding: isImageUrl(product.image) ? 0 : 40, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-        {isImageUrl(product.image) ? <img src={product.image} alt={product.name} style={{ width: "100%", height: 260, objectFit: "cover" }} /> : product.image}
+        {isImageUrl(product.image) ? <img src={product.image} alt={product.name} loading="lazy" style={{ width: "100%", height: 260, objectFit: "cover" }} /> : product.image}
         {(() => { const isDisc = product.discount_percent > 0 && (!product.discount_ends_at || new Date(product.discount_ends_at) > new Date()); return isDisc ? <div style={{ position: "absolute", top: 12, left: 12, background: T.red, color: "#fff", borderRadius: 8, padding: "4px 10px", fontSize: 13, fontWeight: 700 }}>خصم {product.discount_percent}%</div> : null; })()}
         {onFavToggle && <button onClick={() => onFavToggle(product.id)} style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.4)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, cursor: "pointer" }}>{favSet?.has(String(product.id)) ? "❤️" : "🤍"}</button>}
       </div>

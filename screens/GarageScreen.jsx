@@ -165,7 +165,7 @@ const GarageScreen = ({ session }) => {
             <Card style={{ marginBottom: 16, background: `linear-gradient(135deg, ${T.navyLight}, ${T.navyCard})` }}>
               <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 16 }}>
                 {vehicle.images && vehicle.images.length > 0
-                  ? <img src={vehicle.images[0]} alt="" style={{ width: 64, height: 64, borderRadius: 14, objectFit: "cover" }} />
+                  ? <img src={vehicle.images[0]} alt="" loading="lazy" style={{ width: 64, height: 64, borderRadius: 14, objectFit: "cover" }} />
                   : <div style={{ fontSize: 48 }}>🚗</div>}
                 <div>
                   <h3 style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 18, fontWeight: 900 }}>{vehicle.brand} {vehicle.model}</h3>
@@ -204,7 +204,7 @@ const GarageScreen = ({ session }) => {
               {vehicle.images && vehicle.images.length > 1 && (
                 <div style={{ display: "flex", gap: 8, marginTop: 12, overflowX: "auto" }}>
                   {vehicle.images.map((url, i) => (
-                    <img key={i} src={url} alt="" style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
+                    <img key={i} src={url} alt="" loading="lazy" style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
                   ))}
                 </div>
               )}
@@ -276,7 +276,7 @@ const GarageScreen = ({ session }) => {
           <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 8, fontWeight: 600 }}>صور المركبة (اختياري)</label>
           {imagePreviews.length > 0 && (
             <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-              {imagePreviews.map((url, i) => <img key={i} src={url} alt="" style={{ width: 64, height: 64, borderRadius: 10, objectFit: "cover" }} />)}
+              {imagePreviews.map((url, i) => <img key={i} src={url} alt="" loading="lazy" style={{ width: 64, height: 64, borderRadius: 10, objectFit: "cover" }} />)}
             </div>
           )}
           <label style={{ display: "block", background: T.navyLight, border: `1px dashed ${T.navyBorder}`, borderRadius: 10, padding: 12, textAlign: "center", cursor: "pointer", color: T.textMuted, fontSize: 13 }}>
