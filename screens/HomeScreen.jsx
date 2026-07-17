@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import { T, toWhatsAppNumber } from "../utils/theme";
+import { getCategories } from "../utils/hooks";
 import { isImageUrl, Badge, Btn, Card, Input, Modal, Section, AdCarousel, ProductCard, MOCK } from "../utils/components";
 
 let _homeStatsCache = null;
@@ -65,7 +66,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
   }, []);
 
   useEffect(() => {
-    (async () => {
+    const t = setTimeout(async () => {
       setPersonalListingsLoading(true);
       const { data } = await supabase
         .from("personal_listings")
@@ -75,19 +76,18 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
         .limit(10);
       setPersonalListings(data || []);
       setPersonalListingsLoading(false);
-    })();
+    }, 1500);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
-    supabase.from("categories").select("id,name").order("sort_order").then(({ data }) => {
-      if (data) setPublishCategories(data);
-    });
+    getCategories(supabase).then(data => setPublishCategories(data));
   }, []);
 
   useEffect(() => {
     (async () => {
-      const { data: cats } = await supabase.from("categories").select("id,name").order("sort_order");
-      if (!cats) return;
+      const cats = await getCategories(supabase);
+      if (!cats.length) return;
       setHomeCategories(cats);
       const counts = {};
       await Promise.all(cats.map(async (cat) => {
@@ -108,20 +108,25 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
       setTopSellers(_topSellersCache || []);
       return;
     }
-    Promise.all([
-      supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "active"),
-      supabase.from("sellers").select("id", { count: "exact", head: true }),
-      supabase.from("orders").select("id", { count: "exact", head: true }),
-      supabase.from("auctions").select("id", { count: "exact", head: true }),
-    ]).then(([{ count: products }, { count: sellers }, { count: orders }, { count: auctions }]) => {
-      const stats = { products: products || 0, sellers: sellers || 0, orders: orders || 0, auctions: auctions || 0 };
-      setMarketStats(stats);
-      _homeStatsCache = stats;
-    });
-    supabase.from("sellers").select("id, store_name, specialty, seller_type, phone, is_verified").limit(4).then(({ data }) => {
-      setTopSellers(data || []);
-      _topSellersCache = data || [];
-    });
+    const t1 = setTimeout(() => {
+      supabase.from("sellers").select("id, store_name, specialty, seller_type, phone, is_verified").limit(4).then(({ data }) => {
+        setTopSellers(data || []);
+        _topSellersCache = data || [];
+      });
+    }, 1000);
+    const t2 = setTimeout(() => {
+      Promise.all([
+        supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "active"),
+        supabase.from("sellers").select("id", { count: "exact", head: true }),
+        supabase.from("orders").select("id", { count: "exact", head: true }),
+        supabase.from("auctions").select("id", { count: "exact", head: true }),
+      ]).then(([{ count: products }, { count: sellers }, { count: orders }, { count: auctions }]) => {
+        const stats = { products: products || 0, sellers: sellers || 0, orders: orders || 0, auctions: auctions || 0 };
+        setMarketStats(stats);
+        _homeStatsCache = stats;
+      });
+    }, 2000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
   const handlePublishSubmit = async () => {
@@ -381,7 +386,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
                 {personalListings.map(listing => (
                   <Card key={listing.id} onClick={() => setSelectedListing(listing)} style={{ display: "flex", gap: 12, alignItems: "center" }}>
                     <div style={{ width: 56, height: 56, borderRadius: 12, background: T.navyLight, flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>
-                      {isImageUrl(listing.images?.[0]) ? <img src={listing.images[0]} alt={listing.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🏷️"}
+                      {isImageUrl(listing.images?.[0]) ? <img src={listing.images[0]} alt={listing.title} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🏷️"}
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
@@ -481,7 +486,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>صورة (اختياري)</label>
-              {publishImagePreview && <div style={{ marginBottom: 8, borderRadius: 10, overflow: "hidden" }}><img src={publishImagePreview} alt="معاينة" style={{ width: "100%", height: 120, objectFit: "cover" }} /></div>}
+              {publishImagePreview && <div style={{ marginBottom: 8, borderRadius: 10, overflow: "hidden" }}><img src={publishImagePreview} alt="معاينة" loading="lazy" style={{ width: "100%", height: 120, objectFit: "cover" }} /></div>}
               <label style={{ display: "flex", alignItems: "center", gap: 8, background: T.navyLight, border: `1px dashed ${T.navyBorder}`, borderRadius: 10, padding: "10px 14px", cursor: "pointer" }}>
                 <span style={{ fontSize: 18 }}>📷</span>
                 <span style={{ color: T.textSecondary, fontSize: 13 }}>{publishImageFile ? publishImageFile.name : "اختر صورة..."}</span>
@@ -502,7 +507,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
           <>
             {isImageUrl(selectedListing.images?.[0]) && (
               <div style={{ borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
-                <img src={selectedListing.images[0]} alt={selectedListing.title} style={{ width: "100%", height: 180, objectFit: "cover" }} />
+                <img src={selectedListing.images[0]} alt={selectedListing.title} loading="lazy" style={{ width: "100%", height: 180, objectFit: "cover" }} />
               </div>
             )}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>

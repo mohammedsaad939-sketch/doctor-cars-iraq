@@ -231,7 +231,7 @@ export const AdCarousel = ({ onProductView, onNavigate }) => {
         style={{ position: "relative", width: "100%", height: 190, borderRadius: 16, overflow: "hidden", cursor: "pointer", background: T.navyCard }}
       >
         {ad.image_url && (
-          <img src={ad.image_url} alt={ad.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          <img src={ad.image_url} alt={ad.title} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         )}
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%)", padding: "20px 16px 12px" }}>
           <span style={{ color: "#fff", fontWeight: 700, fontSize: 15, textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>{ad.title}</span>
@@ -267,7 +267,7 @@ export const ProductCard = ({ product, onView, onCart, isFav, onFavToggle, onCom
         </button>
       )}
       <div style={{ fontSize: 48, textAlign: "center", marginBottom: 10, background: `${T.navyLight}`, borderRadius: 12, overflow: "hidden", height: 170, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {isImageUrl(product.image) ? <img src={product.image} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : product.image}
+        {isImageUrl(product.image) ? <img src={product.image} alt={product.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : product.image}
       </div>
       <div style={{ marginBottom: 6 }}>
         <Badge small>{product.category}</Badge>

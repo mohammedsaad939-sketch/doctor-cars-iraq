@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import { T, toWhatsAppNumber } from "../utils/theme";
+import { getCategories } from "../utils/hooks";
 import { isImageUrl, Badge, Btn, Card, Input, Modal, Tabs } from "../utils/components";
 
 const AuctionsScreen = ({ onNavigate, session }) => {
@@ -43,11 +44,11 @@ const AuctionsScreen = ({ onNavigate, session }) => {
     auctionImagePreviews.forEach(u => URL.revokeObjectURL(u));
     setAuctionImagePreviews([]);
     setShowCreateModal(true);
-    const [{ data: cats }, { data: veh }] = await Promise.all([
-      supabase.from("categories").select("id,name").neq("id", 11).order("sort_order"),
+    const [allCats, { data: veh }] = await Promise.all([
+      getCategories(supabase),
       supabase.from("vehicles").select("*").eq("owner_id", user.id).order("created_at", { ascending: false }),
     ]);
-    setAuctionCategories(cats || []);
+    setAuctionCategories(allCats.filter(c => c.id !== 11));
     setSellerVehicles(veh || []);
   };
 
@@ -298,7 +299,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                   return displayImages.length > 0 ? (
                     <div style={{ marginBottom: 12 }}>
                       <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", height: 160, background: T.navyLight }}>
-                        <img src={displayImages[gIdx]} alt={auction.title} onClick={() => setLightbox(auction.id)} style={{ width: "100%", height: "100%", objectFit: "cover", cursor: "pointer" }} />
+                        <img src={displayImages[gIdx]} alt={auction.title} onClick={() => setLightbox(auction.id)} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", cursor: "pointer" }} />
                         {displayImages.length > 1 && (
                           <>
                             <button onClick={() => setG(gIdx - 1)} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 30, height: 30, color: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
@@ -485,7 +486,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
           <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.95)", display: "flex", flexDirection: "column" }}>
             <button onClick={() => setLightbox(null)} style={{ position: "absolute", top: 16, right: 16, zIndex: 10000, background: "rgba(255,255,255,0.18)", border: "none", borderRadius: "50%", width: 40, height: 40, color: "#fff", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>✕</button>
             <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
-              <img src={lbImages[lbIdx]} alt={lbAuction.title} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+              <img src={lbImages[lbIdx]} alt={lbAuction.title} loading="lazy" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
               {lbImages.length > 1 && (
                 <>
                   <button onClick={() => lbSetG(lbIdx - 1)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 36, height: 36, color: "#fff", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
@@ -577,7 +578,7 @@ const AuctionsScreen = ({ onNavigate, session }) => {
                     <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                       {auctionImagePreviews.map((url, i) => (
                         <div key={i} style={{ position: "relative" }}>
-                          <img src={url} alt="" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover" }} />
+                          <img src={url} alt="" loading="lazy" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover" }} />
                           <button onClick={() => { URL.revokeObjectURL(url); setAuctionImagePreviews(p => p.filter((_, j) => j !== i)); setAuctionImageFiles(p => p.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: -6, right: -6, background: T.red, color: "#fff", border: "none", borderRadius: "50%", width: 18, height: 18, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>×</button>
                         </div>
                       ))}

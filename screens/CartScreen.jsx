@@ -139,7 +139,7 @@ const CartScreen = ({ session, onNavigate, onCartCountChange, profile }) => {
               return (
                 <Card key={item.id} style={{ display: "flex", gap: 12, alignItems: "center", opacity: updating[item.id] ? 0.6 : 1 }}>
                   <div style={{ width: 56, height: 56, borderRadius: 12, background: T.navyLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, flexShrink: 0, overflow: "hidden" }}>
-                    {isImageUrl(imgSrc) ? <img src={imgSrc} alt={prod.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "📦"}
+                    {isImageUrl(imgSrc) ? <img src={imgSrc} alt={prod.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "📦"}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: "0 0 4px", color: T.textPrimary, fontWeight: 700, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{prod.name || "منتج"}</p>

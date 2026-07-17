@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import { T } from "../utils/theme";
+import { getCategories } from "../utils/hooks";
 import { Card, ProductCard } from "../utils/components";
 
 const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null, favSet, onFavToggle, onCompare, compareSet }) => {
@@ -52,9 +53,7 @@ const ShopScreen = ({ onProductView, onCartAdd, initialCategory = null, favSet, 
   const [nearbyLoading, setNearbyLoading] = useState(false);
 
   useEffect(() => {
-    supabase.from("categories").select("id,name").order("sort_order").then(({ data }) => {
-      if (data) setShopCategories(data);
-    });
+    getCategories(supabase).then(data => setShopCategories(data));
   }, []);
 
   const IRAQI_CITIES = { "Baghdad": "بغداد", "Basra": "البصرة", "Erbil": "أربيل", "Najaf": "النجف", "Karbala": "كربلاء", "Mosul": "الموصل" };

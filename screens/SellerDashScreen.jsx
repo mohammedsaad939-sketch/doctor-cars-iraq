@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import { T, toWhatsAppNumber } from "../utils/theme";
+import { getCategories } from "../utils/hooks";
 import { isImageUrl, Badge, Btn, Card, Input, Modal, Tabs } from "../utils/components";
 
 const SellerAnalyticsTab = ({ sellerId }) => {
@@ -123,10 +124,7 @@ const SellerDashScreen = ({ session, profile }) => {
         setSellerStats({ pendingCount: pendingCount || 0, todayCount: todayCount || 0, revenue, rating: data.rating });
       }
     })();
-    (async () => {
-      const { data } = await supabase.from("categories").select("id,name").order("sort_order");
-      setCategories(data || []);
-    })();
+    getCategories(supabase).then(data => setCategories(data));
   }, [user?.id]);
 
   useEffect(() => {
@@ -232,11 +230,11 @@ const SellerDashScreen = ({ session, profile }) => {
     setEditAuctionNewFiles([]);
     editAuctionNewPreviews.forEach(u => URL.revokeObjectURL(u));
     setEditAuctionNewPreviews([]);
-    const [{ data: cats }, { data: veh }] = await Promise.all([
-      supabase.from("categories").select("id,name").neq("id", 11).order("sort_order"),
+    const [allCats, { data: veh }] = await Promise.all([
+      getCategories(supabase),
       supabase.from("vehicles").select("*").eq("owner_id", user.id).order("created_at", { ascending: false }),
     ]);
-    setEditAuctionCategories(cats || []);
+    setEditAuctionCategories(allCats.filter(c => c.id !== 11));
     setEditAuctionVehicles(veh || []);
   };
 
@@ -629,7 +627,7 @@ const SellerDashScreen = ({ session, profile }) => {
                 <Card key={p.id}>
                   <div style={{ fontSize: 36, textAlign: "center", background: T.navyLight, borderRadius: 10, marginBottom: 8, overflow: "hidden", height: 150, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {isImageUrl(p.images?.[0]) ? (
-                      <img src={p.images[0]} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} />
+                      <img src={p.images[0]} alt={p.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} />
                     ) : (p.images?.[0] || "📦")}
                   </div>
                   <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{p.name}</p>
@@ -679,7 +677,7 @@ const SellerDashScreen = ({ session, profile }) => {
                 <Card key={p.id}>
                   <div style={{ fontSize: 36, textAlign: "center", background: T.navyLight, borderRadius: 10, marginBottom: 8, overflow: "hidden", height: 150, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {isImageUrl(p.images?.[0]) ? (
-                      <img src={p.images[0]} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} />
+                      <img src={p.images[0]} alt={p.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} />
                     ) : (p.images?.[0] || "📦")}
                   </div>
                   <p style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 12, fontWeight: 700 }}>{p.name}</p>
@@ -723,7 +721,7 @@ const SellerDashScreen = ({ session, profile }) => {
               <Card key={auction.id} style={{ marginBottom: 10 }}>
                 <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                   <div style={{ width: 64, height: 64, borderRadius: 10, background: T.navyLight, overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>
-                    {firstImg ? <img src={firstImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🚗"}
+                    {firstImg ? <img src={firstImg} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🚗"}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
@@ -823,7 +821,7 @@ const SellerDashScreen = ({ session, profile }) => {
             {editAuctionNewPreviews.length > 0 && (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                 {editAuctionNewPreviews.map((url, i) => (
-                  <img key={i} src={url} alt="" style={{ width: 60, height: 60, borderRadius: 8, objectFit: "cover" }} />
+                  <img key={i} src={url} alt="" loading="lazy" style={{ width: 60, height: 60, borderRadius: 8, objectFit: "cover" }} />
                 ))}
               </div>
             )}
@@ -920,7 +918,7 @@ const SellerDashScreen = ({ session, profile }) => {
           <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>صورة المنتج (اختياري)</label>
           {imagePreview && (
             <div style={{ marginBottom: 8, borderRadius: 10, overflow: "hidden" }}>
-              <img src={imagePreview} alt="معاينة" style={{ width: "100%", height: 140, objectFit: "cover" }} />
+              <img src={imagePreview} alt="معاينة" loading="lazy" style={{ width: "100%", height: 140, objectFit: "cover" }} />
             </div>
           )}
           <label style={{ display: "flex", alignItems: "center", gap: 8, background: T.navyLight, border: `1px dashed ${T.navyBorder}`, borderRadius: 10, padding: "10px 14px", cursor: "pointer" }}>
