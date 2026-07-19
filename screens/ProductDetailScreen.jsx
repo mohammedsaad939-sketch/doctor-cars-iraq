@@ -318,7 +318,7 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile, fav
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <Btn fullWidth size="sm" icon="💬" variant="ghost" onClick={() => { if (!session?.user?.id) return; if (sellerInfo?.owner_id && onMsgContext) { onMsgContext({ partnerId: sellerInfo.owner_id, partnerName: sellerInfo.store_name || "البائع", productId: product.id, productName: product.name }); if (onNavigate) onNavigate("messages"); } }}>راسل البائع</Btn>
-              <Btn fullWidth size="sm" icon="📱" variant="ghost" onClick={() => { const num = toWhatsAppNumber(sellerInfo?.whatsapp || sellerInfo?.phone); if (num) window.open(`https://wa.me/${num}`); }}>واتساب</Btn>
+              <Btn fullWidth size="sm" icon="📱" variant="ghost" onClick={() => { const num = toWhatsAppNumber(sellerInfo?.whatsapp || sellerInfo?.phone); if (num) window.open(`https://wa.me/${num}`, "_blank", "noopener,noreferrer"); }}>واتساب</Btn>
               <Btn fullWidth size="sm" icon="📞" variant="ghost" onClick={() => { const ph = sellerInfo?.phone; if (ph) window.open(`tel:${ph}`, "_self"); }}>اتصال</Btn>
             </div>
           </Card>
@@ -446,7 +446,7 @@ const ProductDetailScreen = ({ product, onBack, onCartAdd, session, profile, fav
             <Btn fullWidth onClick={handleOpenCheckout} variant="blue" icon="🛍️">اشتري الآن</Btn>
             <Btn size="sm" variant="secondary" icon="↗️" onClick={() => {
               const text = encodeURIComponent(`شاهد هذا على دكتور السيارات:\n${product.name} - ${product.price.toLocaleString("ar-IQ")} د.ع\n${window.location.href}`);
-              window.open(`https://wa.me/?text=${text}`);
+              window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
             }}>مشاركة</Btn>
           </div>
         </div>

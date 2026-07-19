@@ -7,16 +7,31 @@
   "author": "Mohammed Saad",
   "scripts": {
     "dev": "vite",
+    "prebuild": "bash .claude/hooks/pre-build.sh",
     "build": "vite build",
-    "preview": "vite preview"
+    "postbuild": "bash .claude/hooks/post-build.sh",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "pretest": "bash .claude/hooks/pre-test.sh",
+    "test": "vitest run",
+    "posttest": "bash .claude/hooks/post-test.sh",
+    "test:watch": "vitest",
+    "review": "bash .claude/hooks/review.sh"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "@supabase/supabase-js": "^2.45.4"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^5.4.11"
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15.15.0",
+    "jsdom": "^25.0.1",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.9"
   }
 }

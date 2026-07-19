@@ -202,12 +202,12 @@ export const AdCarousel = ({ onProductView, onNavigate }) => {
 
   const handleTap = async (ad) => {
     if (ad.link_type === "external" && ad.external_url) {
-      window.open(ad.external_url, "_blank");
+      window.open(ad.external_url, "_blank", "noopener,noreferrer");
     } else if (ad.link_type === "product" && ad.link_target_id) {
       const { data } = await supabase.from("products").select("*, categories(name)").eq("id", ad.link_target_id).maybeSingle();
       if (data) onProductView({ ...data, image: Array.isArray(data.images) ? (data.images[0] || "📦") : (data.images || "📦"), category: data.categories?.name || "", oldPrice: data.old_price || null, rating: data.rating || 0, reviews: 0 });
-    } else if (ad.link_type === "seller_store") {
-      onNavigate("sellerProfile");
+    } else if (ad.link_type === "seller_store" && ad.link_target_id) {
+      onNavigate("sellerPublic", { sellerId: ad.link_target_id });
     }
   };
 

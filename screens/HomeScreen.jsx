@@ -273,7 +273,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
           ) : (
             <Card style={{ textAlign: "center", padding: 32, marginTop: 16 }}>
               <div style={{ fontSize: 40, marginBottom: 10 }}>🔍</div>
-              <p style={{ color: T.textSecondary, margin: 0 }}>لا توجد نتائج لـ "{searchText}"</p>
+              <p style={{ color: T.textSecondary, margin: 0 }}>لا توجد نتائج لـ &quot;{searchText}&quot;</p>
               <Btn variant="secondary" size="sm" style={{ marginTop: 12 }} onClick={() => onNavigate("request")}>اطلب القطعة</Btn>
             </Card>
           )}
@@ -425,7 +425,7 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
                   </div>
                   <div style={{ color: T.textMuted, fontSize: 11, marginTop: 2 }}>{seller.specialty || seller.seller_type || ""}</div>
                 </div>
-                <button onClick={e => { e.stopPropagation(); const num = toWhatsAppNumber(seller.phone); if (num) window.open(`https://wa.me/${num}`); }} style={{ background: `${T.green}22`, border: `1px solid ${T.green}44`, borderRadius: 10, padding: "6px 12px", color: T.green, fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>تواصل</button>
+                <button onClick={e => { e.stopPropagation(); const num = toWhatsAppNumber(seller.phone); if (num) window.open(`https://wa.me/${num}`, "_blank", "noopener,noreferrer"); }} style={{ background: `${T.green}22`, border: `1px solid ${T.green}44`, borderRadius: 10, padding: "6px 12px", color: T.green, fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>تواصل</button>
               </Card>
             ))}
             {topSellers.length === 0 && <div style={{ textAlign: "center", padding: 20, color: T.textMuted, fontSize: 13 }}>جارٍ التحميل...</div>}
@@ -522,10 +522,10 @@ const HomeScreen = ({ onNavigate, onProductView, onCartAdd, cartCount, notifCoun
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <Btn fullWidth variant="primary" icon="📱" onClick={() => window.open(`tel:${selectedListing.contact_phone}`)}>اتصال</Btn>
-              <Btn fullWidth variant="ghost" icon="💬" onClick={() => window.open(`https://wa.me/${toWhatsAppNumber(selectedListing.contact_phone)}`)}>واتساب</Btn>
+              <Btn fullWidth variant="ghost" icon="💬" onClick={() => window.open(`https://wa.me/${toWhatsAppNumber(selectedListing.contact_phone)}`, "_blank", "noopener,noreferrer")}>واتساب</Btn>
               <Btn size="sm" variant="secondary" icon="↗️" onClick={() => {
                 const text = encodeURIComponent(`شاهد هذا على دكتور السيارات:\n${selectedListing.title} - ${Number(selectedListing.price).toLocaleString("ar-IQ")} د.ع\n${window.location.href}`);
-                window.open(`https://wa.me/?text=${text}`);
+                window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
               }}>مشاركة</Btn>
             </div>
           </>

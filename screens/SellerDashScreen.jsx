@@ -478,7 +478,7 @@ const SellerDashScreen = ({ session, profile }) => {
               <div style={{ color: products.length >= sellerInfo.max_products ? T.red : T.blue, fontWeight: 800, fontSize: 16 }}>{products.length} / {sellerInfo.max_products}</div>
             </div>
             {products.length >= sellerInfo.max_products && (
-              <button onClick={() => { const n = toWhatsAppNumber("07700000000"); if (n) window.open(`https://wa.me/${n}?text=${encodeURIComponent("أريد ترقية اشتراكي في دكتور السيارات")}`); }} style={{ background: `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`, border: "none", borderRadius: 10, padding: "8px 14px", color: T.navy, fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>ترقية الخطة ⬆️</button>
+              <button onClick={() => { const n = toWhatsAppNumber("07700000000"); if (n) window.open(`https://wa.me/${n}?text=${encodeURIComponent("أريد ترقية اشتراكي في دكتور السيارات")}`, "_blank", "noopener,noreferrer"); }} style={{ background: `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`, border: "none", borderRadius: 10, padding: "8px 14px", color: T.navy, fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>ترقية الخطة ⬆️</button>
             )}
           </div>
         </Card>
