@@ -57,7 +57,7 @@ const SellerPublicScreen = ({ sellerId, onProductView, onCartAdd, session, onNav
           ))}
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "center" }}>
-          {seller.whatsapp || seller.phone ? <Btn size="sm" variant="green" icon="📱" onClick={() => { const n = toWhatsAppNumber(seller.whatsapp || seller.phone); if (n) window.open(`https://wa.me/${n}`); }}>واتساب</Btn> : null}
+          {seller.whatsapp || seller.phone ? <Btn size="sm" variant="green" icon="📱" onClick={() => { const n = toWhatsAppNumber(seller.whatsapp || seller.phone); if (n) window.open(`https://wa.me/${n}`, "_blank", "noopener,noreferrer"); }}>واتساب</Btn> : null}
           {seller.phone ? <Btn size="sm" variant="ghost" icon="📞" onClick={() => window.open(`tel:${seller.phone}`, "_self")}>اتصال</Btn> : null}
           {session?.user && seller.owner_id ? <Btn size="sm" variant="ghost" icon="💬" onClick={() => { if (onNavigate) onNavigate("messages"); }}>رسالة</Btn> : null}
         </div>

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { supabase } from "./supabaseClient";
 import { T, toWhatsAppNumber, relativeTime } from "./utils/theme";
+import { isUUID } from "./utils/validators";
 import { Badge, Stars, isImageUrl, Btn, Card, Input, Modal, Tabs, Section, AdCarousel, ProductCard, MOCK } from "./utils/components";
 import HomeScreen from "./screens/HomeScreen";
 import ShopScreen from "./screens/ShopScreen";
@@ -109,8 +110,7 @@ export default function DoctorCarsApp() {
     if (!session?.user?.id) return;
     const uid = session.user.id;
     const pid = String(productId);
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pid);
-    if (!isUUID) return;
+    if (!isUUID(pid)) return;
     if (favSet.has(pid)) {
       setFavSet(prev => { const n = new Set(prev); n.delete(pid); return n; });
       await supabase.from("favorites").delete().eq("user_id", uid).eq("product_id", pid);
@@ -140,8 +140,7 @@ export default function DoctorCarsApp() {
       return;
     }
     const pid = product.id;
-    const isUUID = pid && typeof pid === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pid);
-    if (!isUUID) {
+    if (!isUUID(pid)) {
       setCartToast({ msg: "هذا المنتج غير متوفر في المتجر الإلكتروني حالياً", isError: true });
       setTimeout(() => setCartToast(null), 3000);
       return;
@@ -212,7 +211,7 @@ export default function DoctorCarsApp() {
     );
   }
 
-  const screensWithBack = ["productDetail", "notifications", "cart", "diagnosis", "emergency", "request", "academy", "sellerDash", "admin", "sellerProfile", "myOrders", "favorites", "myReviews", "messages", "addresses", "payments", "sellerPublic", "comparison", "priceEstimator"];
+  const screensWithBack = ["productDetail", "notifications", "cart", "diagnosis", "emergency", "request", "academy", "sellerDash", "admin", "myOrders", "favorites", "myReviews", "messages", "addresses", "payments", "sellerPublic", "comparison", "priceEstimator"];
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -245,11 +244,11 @@ export default function DoctorCarsApp() {
 
   const showBackHeader = screensWithBack.includes(currentScreen);
 
-  const SCREEN_ICONS = { productDetail: "🔧", notifications: "🔔", cart: "🛒", diagnosis: "🤖", emergency: "🚨", request: "📋", academy: "🎓", sellerDash: "🏪", admin: "🛡️", sellerProfile: "🏬", myOrders: "📦", favorites: "❤️", myReviews: "⭐", messages: "💬", addresses: "📍", payments: "💳", sellerPublic: "🏬", comparison: "⊕", priceEstimator: "💰" };
-  const SCREEN_TITLES = { productDetail: "تفاصيل المنتج", notifications: "الإشعارات", cart: "السلة", diagnosis: "تشخيص الأعطال", emergency: "خدمات الطوارئ", request: "طلب قطعة", academy: "الأكاديمية", sellerDash: "لوحة البائع", admin: "لوحة الإدارة", sellerProfile: "ملف البائع", myOrders: "طلباتي", favorites: "مفضلاتي", myReviews: "مراجعاتي", messages: "رسائلي", addresses: "عناويني", payments: "طرق الدفع", sellerPublic: "ملف المتجر", comparison: "مقارنة المنتجات", priceEstimator: "تقدير السعر" };
+  const SCREEN_ICONS = { productDetail: "🔧", notifications: "🔔", cart: "🛒", diagnosis: "🤖", emergency: "🚨", request: "📋", academy: "🎓", sellerDash: "🏪", admin: "🛡️", myOrders: "📦", favorites: "❤️", myReviews: "⭐", messages: "💬", addresses: "📍", payments: "💳", sellerPublic: "🏬", comparison: "⊕", priceEstimator: "💰" };
+  const SCREEN_TITLES = { productDetail: "تفاصيل المنتج", notifications: "الإشعارات", cart: "السلة", diagnosis: "تشخيص الأعطال", emergency: "خدمات الطوارئ", request: "طلب قطعة", academy: "الأكاديمية", sellerDash: "لوحة البائع", admin: "لوحة الإدارة", myOrders: "طلباتي", favorites: "مفضلاتي", myReviews: "مراجعاتي", messages: "رسائلي", addresses: "عناويني", payments: "طرق الدفع", sellerPublic: "ملف المتجر", comparison: "مقارنة المنتجات", priceEstimator: "تقدير السعر" };
 
   return (
-    <div dir="rtl" style={{ fontFamily: "'Cairo', 'Tajawal', 'Segoe UI', sans-serif", background: "#060E1F", minHeight: "100vh", minHeight: "100dvh", maxWidth: 480, margin: "0 auto", position: "relative" }}>
+    <div dir="rtl" style={{ fontFamily: "'Cairo', 'Tajawal', 'Segoe UI', sans-serif", background: "#060E1F", minHeight: "100dvh", maxWidth: 480, margin: "0 auto", position: "relative" }}>
       <style>{`
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 4px; }

@@ -72,7 +72,8 @@ const CarPriceEstimatorScreen = ({ session, onCartAdd, onProductView }) => {
           <div style={{ color: T.textMuted, fontSize: 12, marginBottom: 12 }}>
             بناءً على {result.count} منتج مشابه · معامل الحالة: ×{result.factor}
           </div>
-          <Btn fullWidth variant="primary" icon="📋" onClick={() => {}} size="sm">اعرض سيارتك للبيع</Btn>
+          {/* TODO: wire to a real "list your car" flow once one exists; disabled rather than a dead active-looking button (see .github/copilot-instructions.md Pattern 6) */}
+          <Btn fullWidth variant="primary" icon="📋" onClick={() => {}} disabled size="sm">اعرض سيارتك للبيع (قريباً)</Btn>
         </Card>
       )}
       {similarProducts.length > 0 && (

@@ -72,7 +72,7 @@ const ProfileScreen = ({ onLogout, onNavigate, profile, session }) => {
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <span style={{ color: T.gold, fontWeight: 900, fontSize: 16, letterSpacing: 2 }}>{profile.referral_code}</span>
               <button onClick={() => navigator.clipboard?.writeText(profile.referral_code)} style={{ background: `${T.gold}22`, border: `1px solid ${T.gold}44`, borderRadius: 8, padding: "4px 10px", color: T.gold, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>نسخ</button>
-              <button onClick={() => { const msg = `انضم لدكتور السيارات! كود الإحالة: ${profile.referral_code}`; window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`); }} style={{ background: `${T.green}22`, border: `1px solid ${T.green}44`, borderRadius: 8, padding: "4px 10px", color: T.green, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>مشاركة</button>
+              <button onClick={() => { const msg = `انضم لدكتور السيارات! كود الإحالة: ${profile.referral_code}`; window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer"); }} style={{ background: `${T.green}22`, border: `1px solid ${T.green}44`, borderRadius: 8, padding: "4px 10px", color: T.green, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>مشاركة</button>
             </div>
             {profile.referral_points > 0 && <div style={{ color: T.purple, fontSize: 12, marginTop: 6 }}>⭐ نقاطك: {profile.referral_points}</div>}
           </div>

@@ -84,4 +84,16 @@ npm run dev
 
 ---
 
+## 🛠️ للمطورين (Developers)
+
+هذا المشروع يتضمّن الآن منظومة كاملة لتطوير احترافي:
+
+- `CLAUDE.md` — دليل المشروع الشامل لـ Claude Code (Skills / Agents / Hooks / Workflows).
+- `docs/AUDIT.md` — تدقيق كامل للمستودع وخطة تحسين مُرتّبة بالأولوية.
+- `docs/ARCHITECTURE.md`, `docs/DEVELOPER_GUIDE.md`, `docs/CODING_STANDARDS.md`, `docs/FOLDER_STRUCTURE.md`
+- `CONTRIBUTING.md` — كيفية المساهمة.
+- `npm run lint` / `npm test` / `npm run build` / `npm run review` (فحص شامل).
+
+---
+
 © 2025 محمد سعد (Mohammed Saad) — جميع الحقوق محفوظة | توقيع: 10007

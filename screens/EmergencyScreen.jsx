@@ -33,11 +33,11 @@ const EmergencyScreen = ({ session, profile }) => {
   const handleLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(pos => {
-        window.open(`https://maps.google.com?q=${pos.coords.latitude},${pos.coords.longitude}`);
+        window.open(`https://maps.google.com?q=${pos.coords.latitude},${pos.coords.longitude}`, "_blank", "noopener,noreferrer");
         setFormData(f => ({ ...f, location: `${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}` }));
-      }, () => window.open("https://maps.google.com"));
+      }, () => window.open("https://maps.google.com", "_blank", "noopener,noreferrer"));
     } else {
-      window.open("https://maps.google.com");
+      window.open("https://maps.google.com", "_blank", "noopener,noreferrer");
     }
   };
 
