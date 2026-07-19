@@ -11,6 +11,9 @@ and `docs/AUDIT.md` for the full picture.
 - `docs/AUTHENTICATION.md` — the Authentication & User Management module (sign up/in/out, email
   verification, forgot/reset password, sessions, profile, avatar upload, and the
   Guest/User/Dealer/Verified Dealer/Admin/Super Admin role hierarchy in `utils/roles.js`).
+- `docs/VEHICLE_MANAGEMENT.md` — the Vehicle Management module (create/edit/delete/archive/draft/
+  publish/unpublish/sold/reserved listings, image compression + thumbnails, VIN validation, and the
+  same role hierarchy's permission matrix applied to listings).
 - `CONTRIBUTING.md` — how to propose and land a change.
 - `.github/copilot-instructions.md` — the six most common review-flagged bug patterns in this repo;
   treat these as blocking review items.

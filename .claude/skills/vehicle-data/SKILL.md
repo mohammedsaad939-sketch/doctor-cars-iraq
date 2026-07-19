@@ -11,8 +11,9 @@ Own the shape of vehicle/part/product data as it flows from Supabase into the UI
 
 ## Scope
 - `utils/components.jsx` (`MOCK` fixture, `ProductCard`)
-- `screens/GarageScreen.jsx` (owned-vehicle records)
+- `screens/GarageScreen.jsx` (owned-vehicle records — a different table/concern from listings below)
 - `screens/ProductDetailScreen.jsx`, `screens/ComparisonScreen.jsx`, `screens/CarPriceEstimatorScreen.jsx`
+- `screens/VehicleFormScreen.jsx`, `screens/VehicleManageScreen.jsx`, `screens/VehicleListingsScreen.jsx`, `useVehicleListings.js`, `utils/vehicleStatus.js`, `utils/vehicleOptions.js` (the Vehicle Management module — see `docs/VEHICLE_MANAGEMENT.md`)
 - `.claude/knowledge/vehicle-schema.md`, `.claude/knowledge/vin-validation.md`, `.claude/knowledge/vehicle-specifications.md`
 
 ## Responsibilities

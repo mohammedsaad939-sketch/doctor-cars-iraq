@@ -39,6 +39,7 @@ const ProfileScreen = ({ onLogout, onNavigate, profile, session, role, onProfile
   }, [session?.user?.id]);
   const menuItems = [
     { icon: "🚗", label: "مركباتي", action: () => onNavigate("garage") },
+    { icon: "🚙", label: "سياراتي المعروضة للبيع", action: () => onNavigate("vehicleManage") },
     { icon: "📦", label: "طلباتي", action: () => onNavigate("myOrders") },
     { icon: "❤️", label: "مفضلاتي", action: () => onNavigate("favorites") },
     { icon: "⭐", label: "مراجعاتي", action: () => onNavigate("myReviews") },

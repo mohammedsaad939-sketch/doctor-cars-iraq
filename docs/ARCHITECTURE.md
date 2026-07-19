@@ -34,6 +34,13 @@ existing fields (`profiles.role`, `profiles.is_admin`, `sellers.verified`) plus 
 `supabase/migrations/` for the RLS/trigger enforcement. As with everything else in this app, the
 client-side role checks in `App.jsx` are UX only; Postgres RLS is the real boundary.
 
+## Vehicle Management
+`vehicle_listings` (a new table, distinct from the personal-vehicle `vehicles` table used by
+`GarageScreen`) holds dealer/user for-sale listings with their own status lifecycle
+(draft/published/unpublished/reserved/sold/archived), managed by `useVehicleListings.js` and
+`utils/vehicleStatus.js`. See `docs/VEHICLE_MANAGEMENT.md` for the full design, including why this
+is a separate table rather than a reuse of `vehicles`.
+
 ## Data access
 Every screen that needs data calls `supabase.from(table).select(...)` directly. Row Level Security
 (RLS) in Postgres is the **only** access-control boundary — see `automotive-security`. Realtime
@@ -70,3 +77,4 @@ Vite project). See `.claude/workflows/deployment.md`.
 - `.claude/workflows/` — step-by-step playbooks for common tasks.
 - `docs/AUDIT.md` — the full repository audit and prioritized improvement plan.
 - `docs/AUTHENTICATION.md` — the Authentication & User Management module in full.
+- `docs/VEHICLE_MANAGEMENT.md` — the Vehicle Management module in full.

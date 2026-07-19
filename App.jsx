@@ -32,6 +32,8 @@ import ProfileScreen from "./screens/ProfileScreen";
 import PartRequestScreen from "./screens/PartRequestScreen";
 import RoleSelectionScreen from "./screens/RoleSelectionScreen";
 import ResetPasswordScreen from "./screens/ResetPasswordScreen";
+import VehicleListingsScreen from "./screens/VehicleListingsScreen";
+import VehicleManageScreen from "./screens/VehicleManageScreen";
 
 // ══════════════════════════════════════════════════════════════
 // MAIN APP
@@ -232,7 +234,7 @@ export default function DoctorCarsApp() {
     );
   }
 
-  const screensWithBack = ["productDetail", "notifications", "cart", "diagnosis", "emergency", "request", "academy", "sellerDash", "admin", "myOrders", "favorites", "myReviews", "messages", "addresses", "payments", "sellerPublic", "comparison", "priceEstimator"];
+  const screensWithBack = ["productDetail", "notifications", "cart", "diagnosis", "emergency", "request", "academy", "sellerDash", "admin", "myOrders", "favorites", "myReviews", "messages", "addresses", "payments", "sellerPublic", "comparison", "priceEstimator", "vehicleListings", "vehicleManage"];
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -259,14 +261,16 @@ export default function DoctorCarsApp() {
       case "sellerPublic": return <SellerPublicScreen sellerId={selectedSellerId} onProductView={handleProductView} onCartAdd={handleCartAdd} session={session} onNavigate={navigate} favSet={favSet} onFavToggle={toggleFavorite} />;
       case "comparison": return <ComparisonScreen compareList={compareList} onClear={() => setCompareList([])} onRemove={(id) => setCompareList(prev => prev.filter(p => String(p.id) !== String(id)))} onCartAdd={handleCartAdd} />;
       case "priceEstimator": return <CarPriceEstimatorScreen session={session} onCartAdd={handleCartAdd} onProductView={handleProductView} />;
+      case "vehicleListings": return <VehicleListingsScreen />;
+      case "vehicleManage": return <VehicleManageScreen session={session} role={role} />;
       default: return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} profile={profile} session={session} favSet={favSet} onFavToggle={toggleFavorite} />;
     }
   };
 
   const showBackHeader = screensWithBack.includes(currentScreen);
 
-  const SCREEN_ICONS = { productDetail: "🔧", notifications: "🔔", cart: "🛒", diagnosis: "🤖", emergency: "🚨", request: "📋", academy: "🎓", sellerDash: "🏪", admin: "🛡️", myOrders: "📦", favorites: "❤️", myReviews: "⭐", messages: "💬", addresses: "📍", payments: "💳", sellerPublic: "🏬", comparison: "⊕", priceEstimator: "💰" };
-  const SCREEN_TITLES = { productDetail: "تفاصيل المنتج", notifications: "الإشعارات", cart: "السلة", diagnosis: "تشخيص الأعطال", emergency: "خدمات الطوارئ", request: "طلب قطعة", academy: "الأكاديمية", sellerDash: "لوحة البائع", admin: "لوحة الإدارة", myOrders: "طلباتي", favorites: "مفضلاتي", myReviews: "مراجعاتي", messages: "رسائلي", addresses: "عناويني", payments: "طرق الدفع", sellerPublic: "ملف المتجر", comparison: "مقارنة المنتجات", priceEstimator: "تقدير السعر" };
+  const SCREEN_ICONS = { productDetail: "🔧", notifications: "🔔", cart: "🛒", diagnosis: "🤖", emergency: "🚨", request: "📋", academy: "🎓", sellerDash: "🏪", admin: "🛡️", myOrders: "📦", favorites: "❤️", myReviews: "⭐", messages: "💬", addresses: "📍", payments: "💳", sellerPublic: "🏬", comparison: "⊕", priceEstimator: "💰", vehicleListings: "🚙", vehicleManage: "🚙" };
+  const SCREEN_TITLES = { productDetail: "تفاصيل المنتج", notifications: "الإشعارات", cart: "السلة", diagnosis: "تشخيص الأعطال", emergency: "خدمات الطوارئ", request: "طلب قطعة", academy: "الأكاديمية", sellerDash: "لوحة البائع", admin: "لوحة الإدارة", myOrders: "طلباتي", favorites: "مفضلاتي", myReviews: "مراجعاتي", messages: "رسائلي", addresses: "عناويني", payments: "طرق الدفع", sellerPublic: "ملف المتجر", comparison: "مقارنة المنتجات", priceEstimator: "تقدير السعر", vehicleListings: "معرض السيارات", vehicleManage: "سياراتي المعروضة" };
 
   return (
     <div dir="rtl" style={{ fontFamily: "'Cairo', 'Tajawal', 'Segoe UI', sans-serif", background: "#060E1F", minHeight: "100dvh", maxWidth: 480, margin: "0 auto", position: "relative" }}>
@@ -337,6 +341,7 @@ export default function DoctorCarsApp() {
             { icon: "📋", screen: "request", label: "اطلب قطعة" },
             { icon: "🎓", screen: "academy", label: "الأكاديمية" },
             { icon: "💰", screen: "priceEstimator", label: "تقدير السعر" },
+            { icon: "🚙", screen: "vehicleListings", label: "معرض السيارات" },
           ].map(item => (
             <button key={item.screen} onClick={() => navigate(item.screen)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "4px 8px" }}>
               <span style={{ fontSize: 18 }}>{item.icon}</span>
