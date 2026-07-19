@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   VEHICLE_STATUS,
+  LIVE_STATUSES,
   isValidStatusTransition,
   nextAllowedStatuses,
   requestStatusTransition,
+  getPublishBlockers,
 } from "./vehicleStatus";
 
 const COMPLETE_LISTING = {
@@ -86,5 +88,38 @@ describe("requestStatusTransition", () => {
   it("accepts a transition that doesn't require the publish checks (e.g. draft -> archived)", () => {
     const result = requestStatusTransition({ status: VEHICLE_STATUS.DRAFT }, VEHICLE_STATUS.ARCHIVED);
     expect(result.valid).toBe(true);
+  });
+});
+
+describe("getPublishBlockers", () => {
+  it("returns an empty array for a complete listing", () => {
+    expect(getPublishBlockers(COMPLETE_LISTING)).toEqual([]);
+  });
+
+  it("reports missing required fields", () => {
+    const blockers = getPublishBlockers({ brand: "Toyota" });
+    expect(blockers.some(b => b.includes("model"))).toBe(true);
+  });
+
+  it("reports a missing image", () => {
+    const blockers = getPublishBlockers({ ...COMPLETE_LISTING, images: [] });
+    expect(blockers.some(b => b.includes("صورة"))).toBe(true);
+  });
+
+  it("reports both missing fields and missing images together", () => {
+    const blockers = getPublishBlockers({});
+    expect(blockers.length).toBe(2);
+  });
+
+  // This is exactly the scenario that motivated extracting getPublishBlockers
+  // out of requestStatusTransition: editing an already-*published* listing
+  // down to zero images must be caught even though no status transition is
+  // being requested at all (see VehicleFormScreen#handleSubmit).
+  it("still catches an incomplete listing when editing (no status transition involved)", () => {
+    const publishedListing = { ...COMPLETE_LISTING, status: VEHICLE_STATUS.PUBLISHED };
+    const editedFields = { images: [] };
+    const blockers = getPublishBlockers({ ...publishedListing, ...editedFields });
+    expect(blockers.length).toBeGreaterThan(0);
+    expect(LIVE_STATUSES.includes(publishedListing.status)).toBe(true);
   });
 });

@@ -46,8 +46,39 @@ export function nextAllowedStatuses(status) {
 }
 
 // Minimum fields required before a listing may move out of DRAFT — enforced
-// by requestStatusTransition() so an incomplete listing can't go live.
+// by requestStatusTransition() so an incomplete listing can't go live, and
+// re-checked by getPublishBlockers() whenever an already-live listing is
+// edited, so completeness is an ongoing invariant, not just a one-time gate
+// at the moment of publishing.
 const REQUIRED_TO_PUBLISH = ["brand", "model", "year", "price", "governorate", "city"];
+
+// Statuses in which a listing is currently visible/live to buyers -- editing
+// one of these must not be allowed to leave it incomplete (see
+// VehicleFormScreen#handleSubmit, which calls getPublishBlockers on save
+// whenever the listing being edited is in one of these statuses).
+export const LIVE_STATUSES = [VEHICLE_STATUS.PUBLISHED, VEHICLE_STATUS.RESERVED];
+
+/**
+ * Returns a list of human-readable reasons `listing` does not (yet) satisfy
+ * the minimum-completeness rule for being published, or an empty array if it
+ * does. Pure — used both by requestStatusTransition (gating the publish
+ * action itself) and directly by VehicleFormScreen (gating edits to a
+ * listing that is already live), so the rule is defined exactly once.
+ */
+export function getPublishBlockers(listing) {
+  const missing = REQUIRED_TO_PUBLISH.filter(field => {
+    const value = listing?.[field];
+    return value === null || value === undefined || value === "";
+  });
+  const blockers = [];
+  if (missing.length > 0) {
+    blockers.push(`أكمل الحقول المطلوبة: ${missing.join(", ")}`);
+  }
+  if (!Array.isArray(listing?.images) || listing.images.length === 0) {
+    blockers.push("أضف صورة واحدة على الأقل");
+  }
+  return blockers;
+}
 
 /**
  * Validates a requested status change against both the transition graph and
@@ -64,15 +95,9 @@ export function requestStatusTransition(listing, toStatus) {
     return { valid: false, error: `لا يمكن تغيير الحالة من "${VEHICLE_STATUS_LABELS_AR[fromStatus]}" إلى "${VEHICLE_STATUS_LABELS_AR[toStatus]}"` };
   }
   if (toStatus === VEHICLE_STATUS.PUBLISHED) {
-    const missing = REQUIRED_TO_PUBLISH.filter(field => {
-      const value = listing?.[field];
-      return value === null || value === undefined || value === "";
-    });
-    if (missing.length > 0) {
-      return { valid: false, error: `أكمل الحقول المطلوبة قبل النشر: ${missing.join(", ")}` };
-    }
-    if (!Array.isArray(listing?.images) || listing.images.length === 0) {
-      return { valid: false, error: "أضف صورة واحدة على الأقل قبل النشر" };
+    const blockers = getPublishBlockers(listing);
+    if (blockers.length > 0) {
+      return { valid: false, error: `${blockers.join(" · ")} قبل النشر` };
     }
   }
   return { valid: true, error: null };

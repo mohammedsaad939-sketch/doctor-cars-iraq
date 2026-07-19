@@ -4,6 +4,7 @@ import { Card, Btn, Input, Select, Section } from "../utils/components";
 import { useVehicleListings } from "../useVehicleListings";
 import { isValidVinFormat, vinChecksumMatches, isValidPrice } from "../utils/validators";
 import { IRAQI_GOVERNORATES, FUEL_TYPES, TRANSMISSIONS, DRIVE_TYPES, VEHICLE_CONDITIONS, CURRENCIES, VEHICLE_FEATURES } from "../utils/vehicleOptions";
+import { LIVE_STATUSES, getPublishBlockers } from "../utils/vehicleStatus";
 
 const REQUIRED_FIELDS = ["brand", "model", "year", "price", "governorate", "city"];
 
@@ -221,6 +222,18 @@ const VehicleFormScreen = ({ session, role, listing, onSaved, onCancel }) => {
       video_url: videoUrl,
       documents: documentUrls,
     };
+
+    // A listing that's currently live (published/reserved) must stay
+    // complete while it's live -- the publish-completeness rule isn't just a
+    // one-time gate at the moment of publishing (see
+    // utils/vehicleStatus.js#getPublishBlockers and LIVE_STATUSES).
+    if (isEditing && LIVE_STATUSES.includes(listing.status)) {
+      const blockers = getPublishBlockers({ ...listing, ...fields });
+      if (blockers.length > 0) {
+        setError(`هذا الإعلان منشور حالياً — ${blockers.join(" · ")}، أو قم بإلغاء نشره أولاً من "إدارة سياراتي"`);
+        return;
+      }
+    }
 
     const res = isEditing ? await updateListing(listing.id, fields) : await createListing(fields);
     if (!res.success) { setError(res.error); return; }
