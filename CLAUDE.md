@@ -8,6 +8,9 @@ and `docs/AUDIT.md` for the full picture.
 ## Start here
 - `docs/AUDIT.md` — full repository audit + prioritized improvement plan.
 - `docs/ARCHITECTURE.md` / `docs/FOLDER_STRUCTURE.md` / `docs/CODING_STANDARDS.md` / `docs/DEVELOPER_GUIDE.md`
+- `docs/AUTHENTICATION.md` — the Authentication & User Management module (sign up/in/out, email
+  verification, forgot/reset password, sessions, profile, avatar upload, and the
+  Guest/User/Dealer/Verified Dealer/Admin/Super Admin role hierarchy in `utils/roles.js`).
 - `CONTRIBUTING.md` — how to propose and land a change.
 - `.github/copilot-instructions.md` — the six most common review-flagged bug patterns in this repo;
   treat these as blocking review items.

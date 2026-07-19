@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "../supabaseClient";
 import { T } from "../utils/theme";
-import { Card, Badge } from "../utils/components";
+import { Card, Badge, Modal, Input, Btn } from "../utils/components";
+import { useProfile } from "../useProfile";
+import { ROLES, ROLE_LABELS_AR } from "../utils/roles";
 
 const OWNER = {
   name: "Mohammed Saad",
@@ -10,11 +12,19 @@ const OWNER = {
   year: "2025",
 };
 
-const ProfileScreen = ({ onLogout, onNavigate, profile, session }) => {
+const ProfileScreen = ({ onLogout, onNavigate, profile, session, role, onProfileChange }) => {
   const [ordersCount, setOrdersCount] = useState(null);
   const [reviewsCount, setReviewsCount] = useState(null);
   const [favCount, setFavCount] = useState(null);
   const [msgsUnread, setMsgsUnread] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editCity, setEditCity] = useState("");
+  const [editError, setEditError] = useState(null);
+  const [avatarError, setAvatarError] = useState(null);
+  const avatarInputRef = useRef(null);
+  const { updateProfile, uploadAvatar, updating, uploadingAvatar } = useProfile(session, { onProfileChange });
   useEffect(() => {
     if (!session?.user) return;
     const uid = session.user.id;
@@ -41,18 +51,66 @@ const ProfileScreen = ({ onLogout, onNavigate, profile, session }) => {
     { icon: "🆘", label: "الدعم والمساعدة", action: () => {} },
   ];
 
-  const roleLabels = { buyer: "مشتري", seller: "بائع", wholesale: "تاجر جملة", workshop: "ورشة", admin: "إدارة" };
+  const openEditModal = () => {
+    setEditName(profile?.full_name || "");
+    setEditPhone(profile?.phone || "");
+    setEditCity(profile?.city || "");
+    setEditError(null);
+    setShowEditModal(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) { setEditError("الاسم مطلوب"); return; }
+    setEditError(null);
+    const res = await updateProfile({ full_name: editName.trim(), phone: editPhone.trim(), city: editCity.trim() });
+    if (!res.success) { setEditError(res.error); return; }
+    setShowEditModal(false);
+  };
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+    setAvatarError(null);
+    const res = await uploadAvatar(file);
+    if (!res.success) setAvatarError(res.error);
+  };
+
+  const roleBadgeColor = {
+    [ROLES.GUEST]: T.textMuted,
+    [ROLES.USER]: T.blue,
+    [ROLES.DEALER]: T.orange,
+    [ROLES.VERIFIED_DEALER]: T.green,
+    [ROLES.ADMIN]: T.purple,
+    [ROLES.SUPER_ADMIN]: T.gold,
+  }[role] || T.blue;
 
   return (
     <div style={{ padding: 16 }}>
       {/* Profile Card */}
       <Card style={{ textAlign: "center", marginBottom: 20, background: `linear-gradient(135deg, ${T.navyLight}, ${T.navyCard})` }}>
-        <div style={{ width: 80, height: 80, borderRadius: 24, background: `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, margin: "0 auto 12px" }}>👤</div>
-        <h3 style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 18, fontWeight: 900 }}>{profile?.full_name || "مستخدم جديد"}</h3>
+        <div style={{ position: "relative", width: 80, height: 80, margin: "0 auto 12px" }}>
+          <div style={{ width: 80, height: 80, borderRadius: 24, background: profile?.avatar_url ? "none" : `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, overflow: "hidden" }}>
+            {profile?.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "👤"}
+          </div>
+          <button
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={uploadingAvatar}
+            title="تغيير الصورة"
+            style={{ position: "absolute", bottom: -2, left: -2, width: 28, height: 28, borderRadius: "50%", background: T.gold, border: `2px solid ${T.navyCard}`, color: T.navy, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            {uploadingAvatar ? "…" : "📷"}
+          </button>
+          <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleAvatarChange} style={{ display: "none" }} />
+        </div>
+        {avatarError && <div style={{ color: T.red, fontSize: 11, marginBottom: 8 }}>{avatarError}</div>}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <h3 style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 18, fontWeight: 900 }}>{profile?.full_name || "مستخدم جديد"}</h3>
+          <button onClick={openEditModal} title="تعديل الملف الشخصي" style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 14, padding: 0 }}>✏️</button>
+        </div>
         <p style={{ margin: "0 0 8px", color: T.textSecondary, fontSize: 13 }}>📱 {profile?.phone || "—"} | 📍 {profile?.city || "غير محدد"}</p>
         <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
-          <Badge color={T.blue}>{roleLabels[profile?.role] || "مشتري"}</Badge>
-          {profile?.verified ? <Badge color={T.green}>موثق ✓</Badge> : <Badge color={T.textMuted}>غير موثق</Badge>}
+          <Badge color={roleBadgeColor}>{ROLE_LABELS_AR[role] || ROLE_LABELS_AR[ROLES.USER]}</Badge>
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
           {[
@@ -106,6 +164,14 @@ const ProfileScreen = ({ onLogout, onNavigate, profile, session }) => {
         <span style={{ color: T.textMuted, opacity: 0.8 }}>مالك التطبيق: {OWNER.nameAr} ({OWNER.name})</span><br />
         <span style={{ fontSize: 10, opacity: 0.6 }}>توقيع المالك: {OWNER.signature}</span>
       </p>
+
+      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="تعديل الملف الشخصي">
+        <Input label="الاسم الكامل" value={editName} onChange={setEditName} placeholder="اسمك الكامل" icon="👤" />
+        <Input label="رقم الهاتف" value={editPhone} onChange={setEditPhone} placeholder="07XXXXXXXXX" icon="📱" type="tel" />
+        <Input label="المدينة" value={editCity} onChange={setEditCity} placeholder="بغداد" icon="📍" />
+        {editError && <div style={{ color: T.red, fontSize: 13, marginBottom: 12, background: `${T.red}22`, padding: "10px 14px", borderRadius: 10 }}>⚠️ {editError}</div>}
+        <Btn fullWidth variant="primary" onClick={handleSaveProfile} disabled={updating}>{updating ? "جارٍ الحفظ..." : "حفظ التغييرات"}</Btn>
+      </Modal>
     </div>
   );
 };

@@ -20,9 +20,19 @@ pattern and its consistency rules (a real bug from exactly this pattern — a sc
 doc; see `docs/AUDIT.md`).
 
 ## State
-No Redux/Zustand/Context — shared state (`session`, `profile`, `cartBadgeCount`, `favSet`,
+No Redux/Zustand/Context — shared state (`session`, `profile`, `role`, `cartBadgeCount`, `favSet`,
 `compareList`, language) lives in `App.jsx` and is passed down as props. Screen-local state stays
 in the screen.
+
+## Authentication & Authorization
+`useAuth.js` owns the Supabase Auth session lifecycle (sign up/in/out, OAuth, password reset,
+email verification, session persistence/refresh) and `useProfile.js` owns profile editing + avatar
+upload — kept as two hooks since they're separate concerns. Authorization is a single ranked role
+hierarchy (Guest/User/Dealer/Verified Dealer/Admin/Super Admin) derived by `utils/roles.js` from
+existing fields (`profiles.role`, `profiles.is_admin`, `sellers.verified`) plus one new column
+(`profiles.is_super_admin`) — see `docs/AUTHENTICATION.md` for the full module design and
+`supabase/migrations/` for the RLS/trigger enforcement. As with everything else in this app, the
+client-side role checks in `App.jsx` are UX only; Postgres RLS is the real boundary.
 
 ## Data access
 Every screen that needs data calls `supabase.from(table).select(...)` directly. Row Level Security
@@ -59,3 +69,4 @@ Vite project). See `.claude/workflows/deployment.md`.
 - `.claude/knowledge/` — automotive domain facts (schema, VIN, pricing, moderation, etc.).
 - `.claude/workflows/` — step-by-step playbooks for common tasks.
 - `docs/AUDIT.md` — the full repository audit and prioritized improvement plan.
+- `docs/AUTHENTICATION.md` — the Authentication & User Management module in full.

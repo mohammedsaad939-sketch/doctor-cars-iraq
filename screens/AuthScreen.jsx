@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { supabase } from "../supabaseClient";
 import { T } from "../utils/theme";
 import { Btn, Input } from "../utils/components";
+import { getPasswordStrength, isValidEmail } from "../utils/validators";
+
+const STRENGTH_COLOR = { weak: T.red, fair: T.warning, strong: T.green };
+const STRENGTH_LABEL = { weak: "ضعيفة", fair: "متوسطة", strong: "قوية" };
 
 const OWNER = {
   name: "Mohammed Saad",
@@ -20,7 +23,7 @@ const translateAuthError = (msg = "") => {
   return map[msg] || msg || "حدث خطأ غير متوقع، حاول مرة أخرى";
 };
 
-const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => {
+const AuthScreen = ({ signUp, signIn, authError, signInWithOAuth, resetPasswordForEmail, resendVerificationEmail }) => {
   const [mode, setMode] = useState("login");
   const [userType, setUserType] = useState("buyer");
   const [phone, setPhone] = useState("");
@@ -35,18 +38,26 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSubmitting, setForgotSubmitting] = useState(false);
   const [forgotMsg, setForgotMsg] = useState(null);
+  const [resendState, setResendState] = useState(null); // null | "sending" | "sent"
 
   const handleForgot = async () => {
     if (!forgotEmail.trim()) return;
     setForgotSubmitting(true);
     setForgotMsg(null);
-    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail.trim(), { redirectTo: window.location.origin });
-    if (error) {
-      setForgotMsg({ ok: false, text: error.message });
+    const res = await resetPasswordForEmail(forgotEmail.trim());
+    if (!res.success) {
+      setForgotMsg({ ok: false, text: res.error });
     } else {
       setForgotMsg({ ok: true, text: "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني. تحقق من صندوق الوارد." });
     }
     setForgotSubmitting(false);
+  };
+
+  const handleResendVerification = async () => {
+    if (!email.trim() || resendState === "sending") return;
+    setResendState("sending");
+    await resendVerificationEmail(email.trim());
+    setResendState("sent");
   };
 
   const userTypes = [
@@ -56,10 +67,21 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
     { id: "workshop", label: "ورشة", icon: "🔧" },
   ];
 
+  const passwordStrength = getPasswordStrength(password);
+
   const handleSubmit = async () => {
     setLocalError(null);
+    setResendState(null);
     if (!email || !password) {
       setLocalError("الرجاء إدخال البريد الإلكتروني وكلمة المرور");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setLocalError("الرجاء إدخال بريد إلكتروني صحيح");
+      return;
+    }
+    if (mode === "register" && !passwordStrength.isAcceptable) {
+      setLocalError("كلمة المرور يجب أن تحتوي على 8 أحرف على الأقل، حرف ورقم واحد على الأقل");
       return;
     }
     setSubmitting(true);
@@ -141,6 +163,11 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
         <Input label="البريد الإلكتروني" value={email} onChange={setEmail} placeholder="example@email.com" icon="✉️" type="email" />
         <Input label="رقم الهاتف" value={phone} onChange={setPhone} placeholder="07XXXXXXXXX" icon="📱" type="tel" />
         <Input label="كلمة المرور" value={password} onChange={setPassword} placeholder="••••••••" icon="🔒" type="password" />
+        {mode === "register" && password && (
+          <div style={{ margin: "-8px 0 14px", fontSize: 11, color: STRENGTH_COLOR[passwordStrength.level] }}>
+            قوة كلمة المرور: {STRENGTH_LABEL[passwordStrength.level]}
+          </div>
+        )}
 
         {(localError || authError) && (
           <div style={{
@@ -150,6 +177,11 @@ const AuthScreen = ({ onLogin, signUp, signIn, authError, signInWithOAuth }) => 
             color: localError?.includes("تم إنشاء") ? T.green : T.red, fontSize: 13, lineHeight: 1.6,
           }}>
             {localError || authError}
+            {(localError || authError)?.includes("تأكيد بريدك") && (
+              <button onClick={handleResendVerification} disabled={resendState === "sending"} style={{ display: "block", marginTop: 8, background: "none", border: "none", color: T.gold, fontSize: 13, fontWeight: 700, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                {resendState === "sent" ? "✓ تم إرسال بريد التأكيد مجدداً" : resendState === "sending" ? "جارٍ الإرسال..." : "إعادة إرسال بريد التأكيد"}
+              </button>
+            )}
           </div>
         )}
 
