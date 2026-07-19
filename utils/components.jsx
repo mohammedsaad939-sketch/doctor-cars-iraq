@@ -124,17 +124,38 @@ export const Card = ({ children, style = {}, onClick = null }) => (
   }}>{children}</div>
 );
 
-export const Input = ({ label, value, onChange, placeholder = "", type = "text", icon = null }) => (
+export const Input = ({ label, value, onChange, onBlur = null, placeholder = "", type = "text", icon = null }) => (
   <div style={{ marginBottom: 14 }}>
     {label && <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>{label}</label>}
     <div style={{ position: "relative" }}>
       {icon && <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 16 }}>{icon}</span>}
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder}
         style={{
           width: "100%", background: T.navyLight, border: `1px solid ${T.navyBorder}`,
           borderRadius: 10, padding: `11px ${icon ? 42 : 14}px 11px 14px`, color: T.textPrimary,
           fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box",
         }} />
+    </div>
+  </div>
+);
+
+export const Select = ({ label, value, onChange, options, placeholder = "اختر...", icon = null }) => (
+  <div style={{ marginBottom: 14 }}>
+    {label && <label style={{ display: "block", color: T.textSecondary, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>{label}</label>}
+    <div style={{ position: "relative" }}>
+      {icon && <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 16, pointerEvents: "none" }}>{icon}</span>}
+      <select value={value} onChange={e => onChange(e.target.value)} style={{
+        width: "100%", background: T.navyLight, border: `1px solid ${T.navyBorder}`,
+        borderRadius: 10, padding: `11px ${icon ? 42 : 14}px 11px 14px`, color: value ? T.textPrimary : T.textMuted,
+        fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", cursor: "pointer", appearance: "auto",
+      }}>
+        <option value="">{placeholder}</option>
+        {options.map(opt => {
+          const optValue = typeof opt === "string" ? opt : opt.value;
+          const optLabel = typeof opt === "string" ? opt : opt.label;
+          return <option key={optValue} value={optValue}>{optLabel}</option>;
+        })}
+      </select>
     </div>
   </div>
 );

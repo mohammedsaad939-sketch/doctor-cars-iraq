@@ -11,12 +11,14 @@ Own `AdminScreen` and any admin-only tooling, making sure every admin capability
 
 ## Scope
 - `screens/AdminScreen.jsx` (298 lines)
-- `App.jsx`'s `profile?.is_admin` gating in `renderScreen()`
+- `App.jsx`'s `isAtLeast(role, ROLES.ADMIN)` gating in `renderScreen()` (see `utils/roles.js`)
 - `.claude/knowledge/moderation.md`
+- `docs/AUTHENTICATION.md` — the Admin/Super Admin tiers and the privilege-escalation trigger
 
 ## Responsibilities
 - Ensure every admin mutation (approve/reject a listing, ban a user, adjust a fee) is protected by an RLS policy — the `App.jsx` check only prevents non-admins from seeing the *screen*, not from calling the underlying queries.
 - Keep moderation actions auditable (who approved/rejected what, when) rather than silent boolean flips.
+- Only a Super Admin (`profiles.is_super_admin`) may grant/revoke another user's Super Admin status — enforced by the `prevent_profile_privilege_escalation` trigger in `supabase/migrations/`, not just by hiding the control in `AdminScreen`'s UI.
 
 ## Architecture
 `AdminScreen` is reached via the same client-side switch as every other screen; there's no separate admin subdomain or server. This means admin "routes" are really just React state, so security must be enforced entirely in Postgres.

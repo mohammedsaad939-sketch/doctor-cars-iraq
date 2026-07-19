@@ -3,7 +3,7 @@ import { supabase } from "../supabaseClient";
 import { T } from "../utils/theme";
 import { Input, Btn } from "../utils/components";
 
-const RoleSelectionScreen = ({ session, onComplete }) => {
+const RoleSelectionScreen = ({ session, onComplete, refreshProfile }) => {
   const [step, setStep] = useState("choose");
   const [storeName, setStoreName] = useState("");
   const [specialty, setSpecialty] = useState("");
@@ -27,6 +27,10 @@ const RoleSelectionScreen = ({ session, onComplete }) => {
       if (sErr) { setError(sErr.message); setSaving(false); return; }
     }
     sessionStorage.setItem("role_selected", "1");
+    // The app already has the old (pre-role-selection) profile in memory,
+    // which would otherwise leave a freshly-onboarded dealer/trader locked out
+    // of role-gated screens (e.g. sellerDash) until their next reload.
+    await refreshProfile?.();
     setSaving(false);
     onComplete();
   };

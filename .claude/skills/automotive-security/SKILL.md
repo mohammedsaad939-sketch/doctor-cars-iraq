@@ -33,6 +33,7 @@ There is no backend in this repo — the React app talks to Postgres directly th
 
 ## Naming Conventions
 - Keep `is_admin` as a boolean on `profiles`, gated by RLS — do not introduce a second parallel admin flag anywhere client-side.
+- Use `utils/roles.js`'s `resolveRole()`/`isAtLeast()`/`hasAnyRole()` for any new role-gated feature instead of re-deriving privilege from raw `profile`/`sellers` fields inline — see `docs/AUTHENTICATION.md` for the full Guest/User/Dealer/Verified Dealer/Admin/Super Admin hierarchy and the `prevent_profile_privilege_escalation` trigger that enforces it server-side.
 
 ## Folder Structure
 ```

@@ -4,6 +4,7 @@ import { useAuth } from "./useAuth";
 import { supabase } from "./supabaseClient";
 import { T, toWhatsAppNumber, relativeTime } from "./utils/theme";
 import { isUUID } from "./utils/validators";
+import { ROLES, isAtLeast } from "./utils/roles";
 import { Badge, Stars, isImageUrl, Btn, Card, Input, Modal, Tabs, Section, AdCarousel, ProductCard, MOCK } from "./utils/components";
 import HomeScreen from "./screens/HomeScreen";
 import ShopScreen from "./screens/ShopScreen";
@@ -30,12 +31,19 @@ import PaymentsScreen from "./screens/PaymentsScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import PartRequestScreen from "./screens/PartRequestScreen";
 import RoleSelectionScreen from "./screens/RoleSelectionScreen";
+import ResetPasswordScreen from "./screens/ResetPasswordScreen";
+import VehicleListingsScreen from "./screens/VehicleListingsScreen";
+import VehicleManageScreen from "./screens/VehicleManageScreen";
 
 // ══════════════════════════════════════════════════════════════
 // MAIN APP
 // ══════════════════════════════════════════════════════════════
 export default function DoctorCarsApp() {
-  const { session, profile, loading, authError, signUp, signIn, signOut, signInWithOAuth } = useAuth();
+  const {
+    session, profile, role, loading, authError, passwordRecovery,
+    signUp, signIn, signOut, signInWithOAuth,
+    resetPasswordForEmail, updatePassword, resendVerificationEmail, refreshProfile,
+  } = useAuth();
   const [currentScreen, setCurrentScreen] = useState("home");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [cartBadgeCount, setCartBadgeCount] = useState(0);
@@ -194,10 +202,25 @@ export default function DoctorCarsApp() {
     );
   }
 
+  if (passwordRecovery) {
+    return (
+      <div dir="rtl" style={{ fontFamily: "'Cairo', 'Tajawal', 'Segoe UI', sans-serif" }}>
+        <ResetPasswordScreen updatePassword={updatePassword} onDone={() => setCurrentScreen("profile")} />
+      </div>
+    );
+  }
+
   if (!session) {
     return (
       <div dir="rtl" style={{ fontFamily: "'Cairo', 'Tajawal', 'Segoe UI', sans-serif" }}>
-        <AuthScreen signUp={signUp} signIn={signIn} authError={authError} signInWithOAuth={signInWithOAuth} />
+        <AuthScreen
+          signUp={signUp}
+          signIn={signIn}
+          authError={authError}
+          signInWithOAuth={signInWithOAuth}
+          resetPasswordForEmail={resetPasswordForEmail}
+          resendVerificationEmail={resendVerificationEmail}
+        />
       </div>
     );
   }
@@ -206,12 +229,12 @@ export default function DoctorCarsApp() {
   if (showRoleSelection) {
     return (
       <div dir="rtl" style={{ fontFamily: "'Cairo', 'Tajawal', 'Segoe UI', sans-serif" }}>
-        <RoleSelectionScreen session={session} onComplete={() => setRoleDone(true)} />
+        <RoleSelectionScreen session={session} refreshProfile={refreshProfile} onComplete={() => setRoleDone(true)} />
       </div>
     );
   }
 
-  const screensWithBack = ["productDetail", "notifications", "cart", "diagnosis", "emergency", "request", "academy", "sellerDash", "admin", "myOrders", "favorites", "myReviews", "messages", "addresses", "payments", "sellerPublic", "comparison", "priceEstimator"];
+  const screensWithBack = ["productDetail", "notifications", "cart", "diagnosis", "emergency", "request", "academy", "sellerDash", "admin", "myOrders", "favorites", "myReviews", "messages", "addresses", "payments", "sellerPublic", "comparison", "priceEstimator", "vehicleListings", "vehicleManage"];
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -219,7 +242,7 @@ export default function DoctorCarsApp() {
       case "shop": return <ShopScreen onProductView={handleProductView} onCartAdd={handleCartAdd} initialCategory={selectedCategory} favSet={favSet} onFavToggle={toggleFavorite} onCompare={handleCompare} compareSet={compareSet} />;
       case "auctions": return <AuctionsScreen onNavigate={navigate} session={session} />;
       case "garage": return <GarageScreen session={session} />;
-      case "profile": return <ProfileScreen onLogout={signOut} onNavigate={navigate} profile={profile} session={session} />;
+      case "profile": return <ProfileScreen onLogout={signOut} onNavigate={navigate} profile={profile} session={session} role={role} onProfileChange={refreshProfile} />;
       case "productDetail": return <ProductDetailScreen product={selectedProduct} onBack={() => navigate(prevScreen)} onCartAdd={handleCartAdd} session={session} profile={profile} favSet={favSet} onFavToggle={toggleFavorite} onNavigate={navigate} onMsgContext={setMsgContext} />;
       case "messages": return <MessagesScreen session={session} msgContext={msgContext} onClearMsgContext={() => setMsgContext(null)} />;
       case "addresses": return <AddressesScreen />;
@@ -230,22 +253,24 @@ export default function DoctorCarsApp() {
       case "emergency": return <EmergencyScreen session={session} profile={profile} />;
       case "request": return <PartRequestScreen session={session} profile={profile} />;
       case "academy": return <AcademyScreen />;
-      case "sellerDash": return <SellerDashScreen session={session} profile={profile} />;
+      case "sellerDash": return isAtLeast(role, ROLES.DEALER) ? <SellerDashScreen session={session} profile={profile} /> : <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} profile={profile} session={session} favSet={favSet} onFavToggle={toggleFavorite} />;
       case "myOrders": return <MyOrdersScreen session={session} />;
       case "favorites": return <FavoritesScreen session={session} onProductView={handleProductView} onCartAdd={handleCartAdd} favSet={favSet} onFavToggle={toggleFavorite} />;
       case "myReviews": return <MyReviewsScreen session={session} />;
-      case "admin": return profile?.is_admin ? <AdminScreen /> : <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} profile={profile} session={session} favSet={favSet} onFavToggle={toggleFavorite} />;
+      case "admin": return isAtLeast(role, ROLES.ADMIN) ? <AdminScreen /> : <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} profile={profile} session={session} favSet={favSet} onFavToggle={toggleFavorite} />;
       case "sellerPublic": return <SellerPublicScreen sellerId={selectedSellerId} onProductView={handleProductView} onCartAdd={handleCartAdd} session={session} onNavigate={navigate} favSet={favSet} onFavToggle={toggleFavorite} />;
       case "comparison": return <ComparisonScreen compareList={compareList} onClear={() => setCompareList([])} onRemove={(id) => setCompareList(prev => prev.filter(p => String(p.id) !== String(id)))} onCartAdd={handleCartAdd} />;
       case "priceEstimator": return <CarPriceEstimatorScreen session={session} onCartAdd={handleCartAdd} onProductView={handleProductView} />;
+      case "vehicleListings": return <VehicleListingsScreen />;
+      case "vehicleManage": return <VehicleManageScreen session={session} role={role} />;
       default: return <HomeScreen onNavigate={navigate} onProductView={handleProductView} onCartAdd={handleCartAdd} cartCount={cartBadgeCount} profile={profile} session={session} favSet={favSet} onFavToggle={toggleFavorite} />;
     }
   };
 
   const showBackHeader = screensWithBack.includes(currentScreen);
 
-  const SCREEN_ICONS = { productDetail: "🔧", notifications: "🔔", cart: "🛒", diagnosis: "🤖", emergency: "🚨", request: "📋", academy: "🎓", sellerDash: "🏪", admin: "🛡️", myOrders: "📦", favorites: "❤️", myReviews: "⭐", messages: "💬", addresses: "📍", payments: "💳", sellerPublic: "🏬", comparison: "⊕", priceEstimator: "💰" };
-  const SCREEN_TITLES = { productDetail: "تفاصيل المنتج", notifications: "الإشعارات", cart: "السلة", diagnosis: "تشخيص الأعطال", emergency: "خدمات الطوارئ", request: "طلب قطعة", academy: "الأكاديمية", sellerDash: "لوحة البائع", admin: "لوحة الإدارة", myOrders: "طلباتي", favorites: "مفضلاتي", myReviews: "مراجعاتي", messages: "رسائلي", addresses: "عناويني", payments: "طرق الدفع", sellerPublic: "ملف المتجر", comparison: "مقارنة المنتجات", priceEstimator: "تقدير السعر" };
+  const SCREEN_ICONS = { productDetail: "🔧", notifications: "🔔", cart: "🛒", diagnosis: "🤖", emergency: "🚨", request: "📋", academy: "🎓", sellerDash: "🏪", admin: "🛡️", myOrders: "📦", favorites: "❤️", myReviews: "⭐", messages: "💬", addresses: "📍", payments: "💳", sellerPublic: "🏬", comparison: "⊕", priceEstimator: "💰", vehicleListings: "🚙", vehicleManage: "🚙" };
+  const SCREEN_TITLES = { productDetail: "تفاصيل المنتج", notifications: "الإشعارات", cart: "السلة", diagnosis: "تشخيص الأعطال", emergency: "خدمات الطوارئ", request: "طلب قطعة", academy: "الأكاديمية", sellerDash: "لوحة البائع", admin: "لوحة الإدارة", myOrders: "طلباتي", favorites: "مفضلاتي", myReviews: "مراجعاتي", messages: "رسائلي", addresses: "عناويني", payments: "طرق الدفع", sellerPublic: "ملف المتجر", comparison: "مقارنة المنتجات", priceEstimator: "تقدير السعر", vehicleListings: "معرض السيارات", vehicleManage: "سياراتي المعروضة" };
 
   return (
     <div dir="rtl" style={{ fontFamily: "'Cairo', 'Tajawal', 'Segoe UI', sans-serif", background: "#060E1F", minHeight: "100dvh", maxWidth: 480, margin: "0 auto", position: "relative" }}>
@@ -316,6 +341,7 @@ export default function DoctorCarsApp() {
             { icon: "📋", screen: "request", label: "اطلب قطعة" },
             { icon: "🎓", screen: "academy", label: "الأكاديمية" },
             { icon: "💰", screen: "priceEstimator", label: "تقدير السعر" },
+            { icon: "🚙", screen: "vehicleListings", label: "معرض السيارات" },
           ].map(item => (
             <button key={item.screen} onClick={() => navigate(item.screen)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "4px 8px" }}>
               <span style={{ fontSize: 18 }}>{item.icon}</span>

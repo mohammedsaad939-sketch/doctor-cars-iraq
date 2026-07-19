@@ -29,7 +29,20 @@ Unique constraint on `(user_id, product_id)` — see the insert-then-catch-23505
 
 ## Vehicles (garage)
 Inferred from `MOCK.vehicles` shape (not yet confirmed against a live table): `make`, `model`,
-`year`, `plate`, `color`, `last_service`, `next_service`, `km`, `status`.
+`year`, `plate`, `color`, `last_service`, `next_service`, `km`, `status`. This is a **personal
+owned-vehicle / service-history record** (see `GarageScreen.jsx`) — do not confuse with
+`vehicle_listings` below, a different table for a different concern.
+
+## `vehicle_listings` (implemented — Vehicle Management module)
+Defined in `supabase/migrations/20260719225441_vehicle_listings.sql`; see
+`docs/VEHICLE_MANAGEMENT.md` for the full module. Columns: `id`, `owner_id` (fk → `profiles`),
+`seller_id` (fk → `sellers`, nullable), `brand`, `model`, `trim`, `year`, `vin` (unique when
+non-null), `engine`, `engine_size`, `horsepower`, `transmission`, `fuel_type`, `drive_type`,
+`exterior_color`, `interior_color`, `mileage`, `condition`, `price`, `negotiable`, `currency`,
+`governorate`, `city`, `gps_lat`, `gps_lng`, `description`, `features` (text[]), `images` (text[],
+ordered — index 0 is the cover), `thumbnails` (text[], parallel to `images`), `video_url`,
+`documents` (text[]), `status` (enum — see `vehicle-status.md`), `priority` (bool, set for
+Verified-Dealer-or-above on publish), `created_at`, `updated_at`.
 
 ## Open questions for reconciliation
 - Confirm whether `products.part_no` exists as a real column (referenced conceptually in

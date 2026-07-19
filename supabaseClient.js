@@ -13,4 +13,15 @@ if (!supabaseUrl || !supabaseKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    // Explicit (these are the library defaults) so session-management intent
+    // is documented, not implicit: keep the user signed in across reloads,
+    // silently refresh the access token before it expires, and parse the
+    // recovery/signup token Supabase appends to the URL when a user follows
+    // an email link (password reset, email confirmation) back into the app.
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
